@@ -49,7 +49,7 @@ as a JSON line to `logging.events_path`.
 - [x] **Phase 1** — network-layer core (reverse proxy, IP allow/deny, rate limiting, event log)
 - [x] **Phase 2** — application WAF (Coraza + OWASP CRS, custom SecLang rules, verified live against OWASP Juice Shop). See [benchmarks/](benchmarks/) for GoTestWAF results.
 - [x] **Phase 3** — API/mobile-backend abuse detection: credential-stuffing/token-abuse blocking (`api_abuse`) and JSON Schema request validation (`schema_validation`), both verified live against Juice Shop's real login endpoint.
-- [ ] Phase 4 — attack analytics dashboard
+- [x] **Phase 4** — live attack-analytics dashboard (`dashboard.enabled`): top attacker IPs, top block reasons, a per-minute timeline, and a live event feed over Server-Sent Events. Runs on its own port (no auth yet, so keep it off a public interface — see the config comments). Verified live in a browser against real multi-layer traffic.
 - [ ] Phase 5 — cloud-native packaging
 - [ ] Phase 6 — community release
 

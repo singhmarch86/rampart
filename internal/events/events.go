@@ -30,22 +30,30 @@ type Event struct {
 	Path     string    `json:"path,omitempty"`
 }
 
-// Logger writes events as JSON Lines. It is safe for concurrent use.
+// Logger writes events as JSON Lines and, optionally, fans them out live to
+// in-process subscribers (see Subscribe) — this is how the Phase 4
+// analytics dashboard gets events in real time without tailing the log
+// file. The file is the durable record; subscriptions are best-effort.
 type Logger struct {
-	mu  sync.Mutex
-	out io.WriteCloser
+	mu          sync.Mutex
+	out         io.WriteCloser
+	subscribers map[int]chan Event
+	nextSubID   int
 }
 
 // NewLogger opens path for appending. An empty path yields a no-op logger.
 func NewLogger(path string) (*Logger, error) {
+	l := &Logger{subscribers: make(map[int]chan Event)}
 	if path == "" {
-		return &Logger{out: nopWriteCloser{io.Discard}}, nil
+		l.out = nopWriteCloser{io.Discard}
+		return l, nil
 	}
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, err
 	}
-	return &Logger{out: f}, nil
+	l.out = f
+	return l, nil
 }
 
 func (l *Logger) Log(e Event) {
@@ -53,9 +61,9 @@ func (l *Logger) Log(e Event) {
 		e.Time = time.Now().UTC()
 	}
 	l.mu.Lock()
-	defer l.mu.Unlock()
 	b, err := json.Marshal(e)
 	if err != nil {
+		l.mu.Unlock()
 		log.Printf("events: marshal error: %v", err)
 		return
 	}
@@ -63,6 +71,36 @@ func (l *Logger) Log(e Event) {
 	if _, err := l.out.Write(b); err != nil {
 		log.Printf("events: write error: %v", err)
 	}
+	for _, ch := range l.subscribers {
+		select {
+		case ch <- e:
+		default:
+			// Subscriber isn't keeping up; drop the event for it rather than
+			// block the request path. The JSONL file remains the durable record.
+		}
+	}
+	l.mu.Unlock()
+}
+
+// Subscribe registers a live listener for every future Log call. Call the
+// returned cancel func when done to release the channel.
+func (l *Logger) Subscribe() (<-chan Event, func()) {
+	l.mu.Lock()
+	id := l.nextSubID
+	l.nextSubID++
+	ch := make(chan Event, 256)
+	l.subscribers[id] = ch
+	l.mu.Unlock()
+
+	cancel := func() {
+		l.mu.Lock()
+		if _, ok := l.subscribers[id]; ok {
+			delete(l.subscribers, id)
+			close(ch)
+		}
+		l.mu.Unlock()
+	}
+	return ch, cancel
 }
 
 func (l *Logger) Close() error {

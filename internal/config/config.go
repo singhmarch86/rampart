@@ -17,6 +17,7 @@ type Config struct {
 	WAF       WAFConfig              `yaml:"waf"`
 	APIAbuse  APIAbuseConfig         `yaml:"api_abuse"`
 	Schema    SchemaValidationConfig `yaml:"schema_validation"`
+	Dashboard DashboardConfig        `yaml:"dashboard"`
 	Logging   LoggingConfig          `yaml:"logging"`
 }
 
@@ -108,6 +109,15 @@ type LoggingConfig struct {
 	EventsPath string `yaml:"events_path"`
 }
 
+// DashboardConfig serves the live attack-analytics dashboard. It has no
+// authentication of its own yet, so it's deliberately a separate listener
+// from the public proxy port — see docs/ROADMAP.md.
+type DashboardConfig struct {
+	Enabled bool `yaml:"enabled"`
+	// Listen is the dashboard's own address, separate from the proxy's `listen`.
+	Listen string `yaml:"listen"`
+}
+
 func Default() Config {
 	return Config{
 		Listen:   ":8080",
@@ -122,6 +132,10 @@ func Default() Config {
 		WAF: WAFConfig{
 			Enabled: true,
 			Mode:    "block",
+		},
+		Dashboard: DashboardConfig{
+			Enabled: false,
+			Listen:  "127.0.0.1:9090",
 		},
 		Logging: LoggingConfig{
 			EventsPath: "rampart-events.jsonl",
@@ -190,6 +204,14 @@ func (c Config) Validate() error {
 			if r.SchemaFile == "" {
 				return fmt.Errorf("schema_validation.rules[%d]: schema_file must not be empty", i)
 			}
+		}
+	}
+	if c.Dashboard.Enabled {
+		if c.Dashboard.Listen == "" {
+			return fmt.Errorf("dashboard.listen must not be empty when dashboard is enabled")
+		}
+		if c.Dashboard.Listen == c.Listen {
+			return fmt.Errorf("dashboard.listen must differ from listen (the dashboard must not share the public proxy port)")
 		}
 	}
 	return nil

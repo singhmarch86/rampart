@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gauravdeepsingh/rampart/internal/analytics"
 	"github.com/gauravdeepsingh/rampart/internal/config"
 	"github.com/gauravdeepsingh/rampart/internal/events"
 	"github.com/gauravdeepsingh/rampart/internal/proxy"
@@ -51,6 +52,23 @@ func main() {
 		}
 	}()
 
+	var dashboardServer *http.Server
+	var analyticsStore *analytics.Store
+	if cfg.Dashboard.Enabled {
+		analyticsStore = analytics.New(logger)
+		dashboardServer = &http.Server{
+			Addr:              cfg.Dashboard.Listen,
+			Handler:           analytics.NewServer(analyticsStore).Handler(),
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		go func() {
+			log.Printf("rampart dashboard listening on %s", cfg.Dashboard.Listen)
+			if err := dashboardServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("dashboard server: %v", err)
+			}
+		}()
+	}
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
@@ -60,5 +78,13 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
+	}
+	if dashboardServer != nil {
+		if err := dashboardServer.Shutdown(ctx); err != nil {
+			log.Printf("dashboard shutdown error: %v", err)
+		}
+	}
+	if analyticsStore != nil {
+		analyticsStore.Close()
 	}
 }
