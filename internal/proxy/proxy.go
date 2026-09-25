@@ -1,23 +1,27 @@
 // Package proxy assembles the reverse proxy and its enforcement middleware
-// chain: IP filter -> rate limit -> API-abuse guard -> schema validation ->
-// WAF -> upstream. Ordering matters: the API-abuse guard wraps everything
-// downstream of it so it observes the real final response status (needed to
-// detect auth failures), while schema validation and the WAF each only need
-// to see the request.
+// chain: IP filter -> rate limit -> OIDC RBAC -> API-abuse guard -> schema
+// validation -> WAF -> upstream. Ordering matters: OIDC RBAC runs before
+// the deeper checks so an unauthorized request never reaches them; the
+// API-abuse guard wraps everything downstream of it so it observes the
+// real final response status (needed to detect auth failures); schema
+// validation and the WAF each only need to see the request.
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/gauravdeepsingh/rampart/internal/apiabuse"
 	"github.com/gauravdeepsingh/rampart/internal/config"
 	"github.com/gauravdeepsingh/rampart/internal/events"
 	"github.com/gauravdeepsingh/rampart/internal/ipfilter"
+	"github.com/gauravdeepsingh/rampart/internal/oidcauth"
 	"github.com/gauravdeepsingh/rampart/internal/ratelimit"
 	"github.com/gauravdeepsingh/rampart/internal/schema"
 	"github.com/gauravdeepsingh/rampart/internal/waf"
@@ -75,6 +79,16 @@ func New(cfg config.Config, logger *events.Logger) (*Proxy, error) {
 	if cfg.APIAbuse.Enabled {
 		abuseGuard = apiabuse.New(cfg.APIAbuse, logger)
 		handler = abuseGuard.Middleware(handler)
+	}
+	if cfg.OIDC.Enabled && cfg.OIDC.APIRBAC.Enabled {
+		discoverCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		provider, err := oidcauth.NewProvider(discoverCtx, cfg.OIDC.IssuerURL)
+		cancel()
+		if err != nil {
+			return nil, fmt.Errorf("initializing OIDC RBAC: %w", err)
+		}
+		rbacGuard := oidcauth.NewRBACGuard(provider, cfg.OIDC.APIRBAC, cfg.OIDC.RolesClaim, logger)
+		handler = rbacGuard.Middleware(handler)
 	}
 	handler = withRateLimit(handler, limiter, logger)
 	handler = withIPFilter(handler, filter, logger)

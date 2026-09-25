@@ -74,3 +74,38 @@ logging:
 dashboard:
   enabled: false
   listen: "127.0.0.1:9090"
+
+# Makes Rampart an OIDC relying party / resource server against an
+# EXISTING identity provider (Keycloak, Auth0, Okta, ...) — it does not
+# replace one. Two independent features share this: dashboard login, and
+# role-based enforcement on proxied requests. See docs/OIDC.md.
+oidc:
+  enabled: false
+  issuer_url: "https://keycloak.example.com/realms/myrealm"
+  # Dot-path to a []string of role names in the token's claims. Keycloak's
+  # realm roles live at "realm_access.roles" (the default). Note: for
+  # dashboard login this is read from the ACCESS token, not the ID token —
+  # most providers (Keycloak included) don't put authorization claims like
+  # roles on the ID token, which is about identity, not permissions.
+  roles_claim: "realm_access.roles"
+
+  dashboard_auth:
+    enabled: false
+    client_id: "rampart-dashboard"
+    client_secret: ""
+    redirect_url: "http://localhost:9090/auth/callback"
+    scopes: ["openid", "profile"]
+    # A logged-in user needs at least one of these roles to reach the
+    # dashboard. Empty means any authenticated user may in.
+    required_roles: ["rampart-dashboard-viewer"]
+    # Required, at least 32 bytes, no insecure default: `openssl rand -hex 32`
+    session_secret: ""
+    session_duration: 8h
+
+  api_rbac:
+    enabled: false
+    rules: []
+    # - path_prefix: "/admin"
+    #   required_roles: ["admin"]
+    # - path_prefix: "/api"
+    #   required_roles: []   # empty = any valid token is sufficient

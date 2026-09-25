@@ -25,6 +25,7 @@ Rampart itself during development and how it was fixed.
 - **API / mobile-backend layer** — credential-stuffing detection, token-abuse detection, request-schema validation
 - **Analytics** — attack timeline, top attackers, rule-hit dashboard
 - **Cloud-native** — Docker image, Helm chart, Terraform module
+- **OIDC integration** — dashboard login and API role/permission enforcement against an existing identity provider (Keycloak, Auth0, Okta, ...). Rampart integrates with an IdP; it does not replace one. See [docs/OIDC.md](docs/OIDC.md).
 
 ## License
 
@@ -53,6 +54,7 @@ as a JSON line to `logging.events_path`.
 - [x] **Phase 3** — API/mobile-backend abuse detection: credential-stuffing/token-abuse blocking (`api_abuse`) and JSON Schema request validation (`schema_validation`), both verified live against Juice Shop's real login endpoint.
 - [x] **Phase 4** — live attack-analytics dashboard (`dashboard.enabled`): top attacker IPs, top block reasons, a per-minute timeline, and a live event feed over Server-Sent Events. Runs on its own port (no auth yet, so keep it off a public interface — see the config comments). Verified live in a browser against real multi-layer traffic.
 - [x] **Phase 5** — cloud-native packaging: Docker image (distroless, non-root), `docker compose` demo stack, a Helm chart (standalone/sidecar/ingress patterns, `helm lint`+`helm template` verified), and a Terraform module for AWS ECS Fargate. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+- [x] **OIDC integration** (`oidc.*`) — dashboard login and API role/permission enforcement against an existing IdP. Verified live against a real Keycloak instance (full browser-based Authorization Code + PKCE flow, real realm/client/roles/user), not just mocks. See [docs/OIDC.md](docs/OIDC.md).
 - [ ] Phase 6 — community release
 
 Full detail in [docs/ROADMAP.md](docs/ROADMAP.md).

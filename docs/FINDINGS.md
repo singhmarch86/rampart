@@ -11,6 +11,43 @@ Entries are newest first.
 
 ---
 
+## 6. OIDC dashboard login: roles read from the wrong token
+
+**Found:** During the OIDC/RBAC feature build, via live testing against a
+real Keycloak instance (not a mock) — set up a real realm, client, role,
+and user, then drove the actual browser-based Authorization Code + PKCE
+login flow. The dashboard denied a user who genuinely had the required
+role, with the log reason "authenticated but missing required dashboard
+role" despite the role assignment being correct.
+
+**The bug:** Dashboard login extracted roles from the **ID token**'s
+claims. Keycloak's default "roles" client scope mapper adds
+`realm_access.roles` to the **access token**, not the ID token — decoding
+a real token confirmed the ID token had no `realm_access` claim at all.
+This is correct, standard OIDC hygiene on Keycloak's part (the ID token
+describes who authenticated; the access token describes what they can
+do), but it meant role-based access control was reading a token that
+structurally couldn't have the claim, so it would have failed for
+literally every user, on any stock Keycloak setup, indefinitely.
+
+**The fix:** Added a second verifier for the access token specifically
+(`SkipClientIDCheck: true`, since Keycloak's default access-token audience
+is `"account"`, not the OIDC client ID) and extract roles from it, while
+still using the ID token for identity/nonce verification — that part *is*
+what the ID token is for.
+
+**Verified:** Confirmed by decoding a real Keycloak-issued ID token and
+access token side by side (only the access token had `realm_access`), then
+rebuilt and re-ran the full browser login flow against the same live
+Keycloak instance — role check passed, dashboard rendered. Added two
+regression tests
+(`TestDashboardCallbackExtractsRolesFromAccessTokenNotIDToken` and a
+companion negative test confirming denial still works when the role is
+genuinely absent) using a mock OIDC provider with a real `/token` endpoint,
+so this can't regress silently.
+
+---
+
 ## 5. Docker: event log write fails with "permission denied" in the container
 
 **Found:** Phase 5 (cloud-native packaging), while testing the Docker image

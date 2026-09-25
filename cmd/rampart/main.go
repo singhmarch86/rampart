@@ -15,6 +15,7 @@ import (
 	"github.com/gauravdeepsingh/rampart/internal/analytics"
 	"github.com/gauravdeepsingh/rampart/internal/config"
 	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/gauravdeepsingh/rampart/internal/oidcauth"
 	"github.com/gauravdeepsingh/rampart/internal/proxy"
 )
 
@@ -56,9 +57,27 @@ func main() {
 	var analyticsStore *analytics.Store
 	if cfg.Dashboard.Enabled {
 		analyticsStore = analytics.New(logger)
+		dashboardHandler := analytics.NewServer(analyticsStore).Handler()
+
+		if cfg.OIDC.Enabled && cfg.OIDC.DashboardAuth.Enabled {
+			discoverCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			provider, err := oidcauth.NewProvider(discoverCtx, cfg.OIDC.IssuerURL)
+			cancel()
+			if err != nil {
+				log.Fatalf("OIDC discovery for dashboard auth: %v", err)
+			}
+			dashAuth := oidcauth.NewDashboardAuth(provider, cfg.OIDC.DashboardAuth, cfg.OIDC.RolesClaim, logger)
+
+			mux := http.NewServeMux()
+			mux.Handle("/auth/", dashAuth.Handler())
+			mux.Handle("/", dashAuth.RequireAuth(dashboardHandler))
+			dashboardHandler = mux
+			log.Printf("dashboard requires OIDC login (issuer: %s)", cfg.OIDC.IssuerURL)
+		}
+
 		dashboardServer = &http.Server{
 			Addr:              cfg.Dashboard.Listen,
-			Handler:           analytics.NewServer(analyticsStore).Handler(),
+			Handler:           dashboardHandler,
 			ReadHeaderTimeout: 10 * time.Second,
 		}
 		go func() {

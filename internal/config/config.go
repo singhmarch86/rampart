@@ -18,6 +18,7 @@ type Config struct {
 	APIAbuse  APIAbuseConfig         `yaml:"api_abuse"`
 	Schema    SchemaValidationConfig `yaml:"schema_validation"`
 	Dashboard DashboardConfig        `yaml:"dashboard"`
+	OIDC      OIDCConfig             `yaml:"oidc"`
 	Logging   LoggingConfig          `yaml:"logging"`
 }
 
@@ -118,6 +119,73 @@ type DashboardConfig struct {
 	Listen string `yaml:"listen"`
 }
 
+// OIDCConfig makes Rampart an OIDC *relying party / resource server* against
+// an existing identity provider (Keycloak, Auth0, Okta, ...). It does not
+// make Rampart an identity provider itself — user storage, login UI, and
+// token issuance stay with whatever IssuerURL points at. Two independent
+// things share this config: dashboard login (DashboardAuth) and
+// role-based enforcement on proxied requests (APIRBAC).
+type OIDCConfig struct {
+	Enabled bool `yaml:"enabled"`
+	// IssuerURL is the OIDC provider's issuer, e.g.
+	// "https://keycloak.example.com/realms/myrealm". Used for discovery
+	// (.well-known/openid-configuration) and JWKS.
+	IssuerURL string `yaml:"issuer_url"`
+	// RolesClaim is a dot-path into the token's claims where a []string of
+	// role names lives. Keycloak's realm roles live at "realm_access.roles"
+	// (the default); adjust for other providers (e.g. a custom namespaced
+	// claim for Auth0, or "groups" for many providers using group-based auth).
+	RolesClaim string `yaml:"roles_claim"`
+
+	DashboardAuth DashboardAuthConfig `yaml:"dashboard_auth"`
+	APIRBAC       APIRBACConfig       `yaml:"api_rbac"`
+}
+
+// DashboardAuthConfig requires an OIDC login (Authorization Code + PKCE) to
+// view the dashboard, closing the "no authentication" gap noted since
+// Phase 4. Session state is a signed cookie, not server-side storage.
+type DashboardAuthConfig struct {
+	Enabled      bool   `yaml:"enabled"`
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	// RedirectURL must exactly match a redirect URI registered with the
+	// OIDC client, e.g. "http://localhost:9090/auth/callback".
+	RedirectURL string   `yaml:"redirect_url"`
+	Scopes      []string `yaml:"scopes"`
+	// RequiredRoles: a logged-in user needs at least one of these roles to
+	// reach the dashboard. Empty means any authenticated user may in.
+	RequiredRoles []string `yaml:"required_roles"`
+	// SessionSecret signs the session cookie (HMAC-SHA256). Required —
+	// there is no insecure default. Generate with e.g. `openssl rand -hex 32`.
+	SessionSecret string `yaml:"session_secret"`
+	// SessionDuration caps how long a session is valid without re-login,
+	// independent of the OIDC token's own expiry.
+	SessionDuration time.Duration `yaml:"session_duration"`
+}
+
+// APIRBACConfig validates OIDC access tokens on proxied requests and
+// enforces per-route role requirements before forwarding upstream — the
+// same pattern API gateways (Kong's OIDC plugin, Envoy's JWT filter) use.
+type APIRBACConfig struct {
+	Enabled bool          `yaml:"enabled"`
+	Rules   []APIRBACRule `yaml:"rules"`
+}
+
+type APIRBACRule struct {
+	// Methods this rule applies to. Empty means all methods.
+	Methods []string `yaml:"methods"`
+	// PathPrefix selects which requests this rule guards.
+	PathPrefix string `yaml:"path_prefix"`
+	// Audience, if set, must appear in the token's `aud` claim. Leave empty
+	// to skip the audience check (common for Keycloak access tokens, whose
+	// audience often isn't the calling client).
+	Audience string `yaml:"audience"`
+	// RequiredRoles: the token needs at least one of these roles. Empty
+	// means any validly-signed, unexpired token is sufficient — no
+	// specific role required, just "must be authenticated".
+	RequiredRoles []string `yaml:"required_roles"`
+}
+
 func Default() Config {
 	return Config{
 		Listen:   ":8080",
@@ -136,6 +204,13 @@ func Default() Config {
 		Dashboard: DashboardConfig{
 			Enabled: false,
 			Listen:  "127.0.0.1:9090",
+		},
+		OIDC: OIDCConfig{
+			RolesClaim: "realm_access.roles",
+			DashboardAuth: DashboardAuthConfig{
+				Scopes:          []string{"openid", "profile"},
+				SessionDuration: 8 * time.Hour,
+			},
 		},
 		Logging: LoggingConfig{
 			EventsPath: "rampart-events.jsonl",
@@ -212,6 +287,38 @@ func (c Config) Validate() error {
 		}
 		if c.Dashboard.Listen == c.Listen {
 			return fmt.Errorf("dashboard.listen must differ from listen (the dashboard must not share the public proxy port)")
+		}
+	}
+	if c.OIDC.Enabled {
+		if c.OIDC.IssuerURL == "" {
+			return fmt.Errorf("oidc.issuer_url must not be empty when oidc is enabled")
+		}
+		if c.OIDC.RolesClaim == "" {
+			return fmt.Errorf("oidc.roles_claim must not be empty when oidc is enabled")
+		}
+		if c.OIDC.DashboardAuth.Enabled {
+			if !c.Dashboard.Enabled {
+				return fmt.Errorf("oidc.dashboard_auth.enabled requires dashboard.enabled")
+			}
+			if c.OIDC.DashboardAuth.ClientID == "" {
+				return fmt.Errorf("oidc.dashboard_auth.client_id must not be empty when enabled")
+			}
+			if c.OIDC.DashboardAuth.RedirectURL == "" {
+				return fmt.Errorf("oidc.dashboard_auth.redirect_url must not be empty when enabled")
+			}
+			if len(c.OIDC.DashboardAuth.SessionSecret) < 32 {
+				return fmt.Errorf("oidc.dashboard_auth.session_secret must be set and at least 32 bytes (e.g. `openssl rand -hex 32`) — there is no insecure default")
+			}
+			if c.OIDC.DashboardAuth.SessionDuration <= 0 {
+				return fmt.Errorf("oidc.dashboard_auth.session_duration must be > 0")
+			}
+		}
+		if c.OIDC.APIRBAC.Enabled {
+			for i, r := range c.OIDC.APIRBAC.Rules {
+				if r.PathPrefix == "" {
+					return fmt.Errorf("oidc.api_rbac.rules[%d]: path_prefix must not be empty", i)
+				}
+			}
 		}
 	}
 	return nil
