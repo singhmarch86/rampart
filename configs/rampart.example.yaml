@@ -1,0 +1,30 @@
+# Rampart configuration. Copy to rampart.yaml and adjust for your deployment.
+
+# Address Rampart itself listens on.
+listen: ":8080"
+
+# The application Rampart protects. All allowed traffic is proxied here.
+upstream: "http://localhost:3000"
+
+firewall:
+  # If non-empty, ONLY these CIDRs/IPs may reach the upstream. Leave empty to allow all
+  # (subject to deny below).
+  allow: []
+  # Always blocked, even if allow is empty. Example: block a known-bad range.
+  deny: []
+  # - "203.0.113.0/24"
+
+rate_limit:
+  enabled: true
+  # Sustained requests/sec allowed per client IP.
+  requests_per_second: 10
+  # Burst above the sustained rate allowed in a single instant.
+  burst: 20
+  # Max simultaneous in-flight requests per client IP (0 disables this check).
+  max_concurrent_per_ip: 50
+  # How long to keep rate-limit state for an IP after its last request.
+  idle_timeout: 10m
+
+logging:
+  # Structured JSONL log of every block/allow decision. Feeds the Phase 4 analytics dashboard.
+  events_path: "rampart-events.jsonl"

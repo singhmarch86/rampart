@@ -1,0 +1,36 @@
+# Rampart
+
+A self-hosted, open-core firewall and attack-analytics platform. Rampart sits
+in front of your application as a reverse proxy and blocks network-, application-,
+and API-layer attacks in one place, then gives you a single dashboard to see
+what was blocked and why.
+
+## Why
+
+Most teams stitch together nginx + ModSecurity + fail2ban + a log pipeline +
+a dashboard to get this. Rampart aims to ship it as one binary with sane
+defaults, so a small team gets WAF + rate-limiting + analytics without
+assembling five tools.
+
+## Status
+
+Early development. Not production-ready yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Scope
+
+- **Network layer** — IP allow/deny lists, rate limiting, geo-blocking, connection-flood mitigation
+- **Application layer (WAF)** — OWASP Top 10 detection via the Coraza engine + OWASP Core Rule Set
+- **API / mobile-backend layer** — credential-stuffing detection, token-abuse detection, request-schema validation
+- **Analytics** — attack timeline, top attackers, rule-hit dashboard
+- **Cloud-native** — Docker image, Helm chart, Terraform module
+
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE). The core engine is and will remain free
+and open source. A hosted analytics console (multi-node management, longer
+retention, threat-intel feed) is planned as a paid add-on; it will never be
+required to run the core firewall.
+
+## Quick start
+
+Not yet available — Phase 1 (network-layer core) is in progress.
