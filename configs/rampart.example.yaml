@@ -25,6 +25,32 @@ waf:
   request_body_limit: 0
   response_body_limit: 0
 
+# Detects credential stuffing and token abuse: repeated authentication
+# failures from the same IP against a configured endpoint get temporarily
+# blocked. Configure a rule per auth-gated route you want watched.
+api_abuse:
+  enabled: true
+  rules:
+    - name: "login-brute-force"
+      methods: ["POST"]
+      path_prefix: "/rest/user/login"
+      # Status code(s) that mean "this attempt failed" for this endpoint.
+      failure_status_codes: [401]
+      max_failures: 5
+      window: 1m
+      block_duration: 5m
+
+# Rejects request bodies that don't match an expected JSON Schema for a
+# route — catches malformed/unexpected-field requests (e.g. mass
+# assignment) that the WAF's attack-signature rules aren't designed to
+# catch, since there's no "attack pattern" in a structurally-wrong request.
+schema_validation:
+  enabled: true
+  rules:
+    - methods: ["POST"]
+      path_prefix: "/rest/user/login"
+      schema_file: "configs/schemas/login.json"
+
 rate_limit:
   enabled: true
   # Sustained requests/sec allowed per client IP.

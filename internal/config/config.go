@@ -10,12 +10,14 @@ import (
 )
 
 type Config struct {
-	Listen    string          `yaml:"listen"`
-	Upstream  string          `yaml:"upstream"`
-	Firewall  FirewallConfig  `yaml:"firewall"`
-	RateLimit RateLimitConfig `yaml:"rate_limit"`
-	WAF       WAFConfig       `yaml:"waf"`
-	Logging   LoggingConfig   `yaml:"logging"`
+	Listen    string                 `yaml:"listen"`
+	Upstream  string                 `yaml:"upstream"`
+	Firewall  FirewallConfig         `yaml:"firewall"`
+	RateLimit RateLimitConfig        `yaml:"rate_limit"`
+	WAF       WAFConfig              `yaml:"waf"`
+	APIAbuse  APIAbuseConfig         `yaml:"api_abuse"`
+	Schema    SchemaValidationConfig `yaml:"schema_validation"`
+	Logging   LoggingConfig          `yaml:"logging"`
 }
 
 type FirewallConfig struct {
@@ -50,6 +52,55 @@ type WAFConfig struct {
 	// are buffered for inspection, in bytes. Zero uses Coraza's defaults.
 	RequestBodyLimit  int `yaml:"request_body_limit"`
 	ResponseBodyLimit int `yaml:"response_body_limit"`
+}
+
+// APIAbuseConfig detects credential stuffing and token abuse: repeated
+// authentication failures from the same IP against a configured endpoint.
+// Both use cases share one mechanism (a rule watching for a flood of
+// "failure" status codes on a path) because a brute-forced login and a
+// brute-forced/guessed token both look the same from the firewall's
+// vantage point: the same client racking up 401s.
+type APIAbuseConfig struct {
+	Enabled bool           `yaml:"enabled"`
+	Rules   []APIAbuseRule `yaml:"rules"`
+}
+
+type APIAbuseRule struct {
+	// Name identifies the rule in logs and config errors.
+	Name string `yaml:"name"`
+	// Methods this rule applies to. Empty means all methods.
+	Methods []string `yaml:"methods"`
+	// PathPrefix selects which requests this rule watches.
+	PathPrefix string `yaml:"path_prefix"`
+	// FailureStatusCodes are the upstream response codes that count as a
+	// failed attempt (e.g. 401 for a rejected login or invalid token).
+	FailureStatusCodes []int `yaml:"failure_status_codes"`
+	// MaxFailures is how many failures from one IP within Window trigger a block.
+	MaxFailures int `yaml:"max_failures"`
+	// Window is the sliding period failures are counted over.
+	Window time.Duration `yaml:"window"`
+	// BlockDuration is how long the IP is blocked once MaxFailures is reached.
+	BlockDuration time.Duration `yaml:"block_duration"`
+}
+
+// SchemaValidationConfig rejects request bodies that don't match an
+// expected JSON Schema for a route, before they reach the upstream
+// application. This targets malformed/unexpected-field abuse (e.g. mass
+// assignment) that pattern-matching WAF rules aren't designed to catch,
+// since a well-formed-looking but structurally wrong request isn't an
+// attack signature, it's a schema violation.
+type SchemaValidationConfig struct {
+	Enabled bool         `yaml:"enabled"`
+	Rules   []SchemaRule `yaml:"rules"`
+}
+
+type SchemaRule struct {
+	// Methods this rule applies to. Empty means all methods.
+	Methods []string `yaml:"methods"`
+	// PathPrefix selects which requests this rule validates.
+	PathPrefix string `yaml:"path_prefix"`
+	// SchemaFile is a path to a JSON Schema (draft 2020-12/2019-09/07) file.
+	SchemaFile string `yaml:"schema_file"`
 }
 
 type LoggingConfig struct {
@@ -111,6 +162,35 @@ func (c Config) Validate() error {
 	}
 	if c.WAF.Enabled && c.WAF.Mode != "" && c.WAF.Mode != "block" && c.WAF.Mode != "detect" {
 		return fmt.Errorf("waf.mode must be \"block\" or \"detect\", got %q", c.WAF.Mode)
+	}
+	if c.APIAbuse.Enabled {
+		for i, r := range c.APIAbuse.Rules {
+			if r.PathPrefix == "" {
+				return fmt.Errorf("api_abuse.rules[%d]: path_prefix must not be empty", i)
+			}
+			if len(r.FailureStatusCodes) == 0 {
+				return fmt.Errorf("api_abuse.rules[%d] (%s): failure_status_codes must not be empty", i, r.Name)
+			}
+			if r.MaxFailures <= 0 {
+				return fmt.Errorf("api_abuse.rules[%d] (%s): max_failures must be > 0", i, r.Name)
+			}
+			if r.Window <= 0 {
+				return fmt.Errorf("api_abuse.rules[%d] (%s): window must be > 0", i, r.Name)
+			}
+			if r.BlockDuration <= 0 {
+				return fmt.Errorf("api_abuse.rules[%d] (%s): block_duration must be > 0", i, r.Name)
+			}
+		}
+	}
+	if c.Schema.Enabled {
+		for i, r := range c.Schema.Rules {
+			if r.PathPrefix == "" {
+				return fmt.Errorf("schema_validation.rules[%d]: path_prefix must not be empty", i)
+			}
+			if r.SchemaFile == "" {
+				return fmt.Errorf("schema_validation.rules[%d]: schema_file must not be empty", i)
+			}
+		}
 	}
 	return nil
 }

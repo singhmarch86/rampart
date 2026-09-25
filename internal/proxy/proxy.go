@@ -1,6 +1,9 @@
 // Package proxy assembles the reverse proxy and its enforcement middleware
-// chain: IP filter -> rate limit -> upstream. Later phases insert the WAF
-// and API-abuse layers into this same chain.
+// chain: IP filter -> rate limit -> API-abuse guard -> schema validation ->
+// WAF -> upstream. Ordering matters: the API-abuse guard wraps everything
+// downstream of it so it observes the real final response status (needed to
+// detect auth failures), while schema validation and the WAF each only need
+// to see the request.
 package proxy
 
 import (
@@ -11,16 +14,19 @@ import (
 	"net/http/httputil"
 	"net/url"
 
+	"github.com/gauravdeepsingh/rampart/internal/apiabuse"
 	"github.com/gauravdeepsingh/rampart/internal/config"
 	"github.com/gauravdeepsingh/rampart/internal/events"
 	"github.com/gauravdeepsingh/rampart/internal/ipfilter"
 	"github.com/gauravdeepsingh/rampart/internal/ratelimit"
+	"github.com/gauravdeepsingh/rampart/internal/schema"
 	"github.com/gauravdeepsingh/rampart/internal/waf"
 )
 
 type Proxy struct {
-	handler http.Handler
-	limiter *ratelimit.Limiter
+	handler    http.Handler
+	limiter    *ratelimit.Limiter
+	abuseGuard *apiabuse.Guard
 }
 
 func New(cfg config.Config, logger *events.Logger) (*Proxy, error) {
@@ -58,10 +64,22 @@ func New(cfg config.Config, logger *events.Logger) (*Proxy, error) {
 		}
 		handler = wafEngine.Middleware(handler)
 	}
+	if cfg.Schema.Enabled {
+		validator, err := schema.New(cfg.Schema, logger)
+		if err != nil {
+			return nil, fmt.Errorf("initializing schema validation: %w", err)
+		}
+		handler = validator.Middleware(handler)
+	}
+	var abuseGuard *apiabuse.Guard
+	if cfg.APIAbuse.Enabled {
+		abuseGuard = apiabuse.New(cfg.APIAbuse, logger)
+		handler = abuseGuard.Middleware(handler)
+	}
 	handler = withRateLimit(handler, limiter, logger)
 	handler = withIPFilter(handler, filter, logger)
 
-	return &Proxy{handler: handler, limiter: limiter}, nil
+	return &Proxy{handler: handler, limiter: limiter, abuseGuard: abuseGuard}, nil
 }
 
 func (p *Proxy) Handler() http.Handler {
@@ -71,6 +89,9 @@ func (p *Proxy) Handler() http.Handler {
 func (p *Proxy) Close() {
 	if p.limiter != nil {
 		p.limiter.Close()
+	}
+	if p.abuseGuard != nil {
+		p.abuseGuard.Close()
 	}
 }
 

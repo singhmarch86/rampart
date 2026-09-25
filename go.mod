@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/corazawaf/coraza-coreruleset/v4 v4.25.0
 	github.com/corazawaf/coraza/v3 v3.7.0
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	golang.org/x/time v0.16.0
 	gopkg.in/yaml.v3 v3.0.1
 )
