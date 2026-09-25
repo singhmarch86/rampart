@@ -4,6 +4,7 @@
 package proxy
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/gauravdeepsingh/rampart/internal/events"
 	"github.com/gauravdeepsingh/rampart/internal/ipfilter"
 	"github.com/gauravdeepsingh/rampart/internal/ratelimit"
+	"github.com/gauravdeepsingh/rampart/internal/waf"
 )
 
 type Proxy struct {
@@ -49,6 +51,13 @@ func New(cfg config.Config, logger *events.Logger) (*Proxy, error) {
 	}
 
 	var handler http.Handler = reverseProxy
+	if cfg.WAF.Enabled {
+		wafEngine, err := waf.New(cfg.WAF, logger)
+		if err != nil {
+			return nil, fmt.Errorf("initializing WAF: %w", err)
+		}
+		handler = wafEngine.Middleware(handler)
+	}
 	handler = withRateLimit(handler, limiter, logger)
 	handler = withIPFilter(handler, filter, logger)
 

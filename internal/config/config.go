@@ -14,6 +14,7 @@ type Config struct {
 	Upstream  string          `yaml:"upstream"`
 	Firewall  FirewallConfig  `yaml:"firewall"`
 	RateLimit RateLimitConfig `yaml:"rate_limit"`
+	WAF       WAFConfig       `yaml:"waf"`
 	Logging   LoggingConfig   `yaml:"logging"`
 }
 
@@ -37,6 +38,20 @@ type RateLimitConfig struct {
 	IdleTimeout time.Duration `yaml:"idle_timeout"`
 }
 
+type WAFConfig struct {
+	Enabled bool `yaml:"enabled"`
+	// Mode is "block" (enforce) or "detect" (log matches but let requests through;
+	// useful for tuning a new deployment before enabling enforcement).
+	Mode string `yaml:"mode"`
+	// CustomRulesDir, if set, loads every *.conf file in the directory (SecLang syntax,
+	// same as ModSecurity/CRS) after the OWASP Core Rule Set, sorted by filename.
+	CustomRulesDir string `yaml:"custom_rules_dir"`
+	// RequestBodyLimit/ResponseBodyLimit cap how many bytes of a request/response body
+	// are buffered for inspection, in bytes. Zero uses Coraza's defaults.
+	RequestBodyLimit  int `yaml:"request_body_limit"`
+	ResponseBodyLimit int `yaml:"response_body_limit"`
+}
+
 type LoggingConfig struct {
 	// EventsPath is where structured JSONL block/allow events are written. Empty disables event logging.
 	EventsPath string `yaml:"events_path"`
@@ -52,6 +67,10 @@ func Default() Config {
 			Burst:              20,
 			MaxConcurrentPerIP: 50,
 			IdleTimeout:        10 * time.Minute,
+		},
+		WAF: WAFConfig{
+			Enabled: true,
+			Mode:    "block",
 		},
 		Logging: LoggingConfig{
 			EventsPath: "rampart-events.jsonl",
@@ -89,6 +108,9 @@ func (c Config) Validate() error {
 		if c.RateLimit.Burst <= 0 {
 			return fmt.Errorf("rate_limit.burst must be > 0 when enabled")
 		}
+	}
+	if c.WAF.Enabled && c.WAF.Mode != "" && c.WAF.Mode != "block" && c.WAF.Mode != "detect" {
+		return fmt.Errorf("waf.mode must be \"block\" or \"detect\", got %q", c.WAF.Mode)
 	}
 	return nil
 }

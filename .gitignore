@@ -5,3 +5,7 @@
 .DS_Store
 rampart.db
 configs/rampart.yaml
+/benchmarks/reports/
+/benchmarks/reports-baseline/
+rampart-benchmark.log
+rampart-benchmark-events.jsonl

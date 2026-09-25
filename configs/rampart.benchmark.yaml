@@ -1,0 +1,23 @@
+# Config used only for running GoTestWAF against Rampart's WAF layer in
+# isolation. Rate limiting is disabled here so GoTestWAF's request volume
+# doesn't get blocked by the rate limiter and get miscounted as a WAF catch —
+# this config exists to measure the WAF layer specifically, not the full stack.
+listen: ":8081"
+upstream: "http://localhost:3000"
+
+firewall:
+  allow: []
+  deny: []
+
+waf:
+  enabled: true
+  mode: "block"
+  custom_rules_dir: "configs/waf-custom-rules"
+  request_body_limit: 0
+  response_body_limit: 0
+
+rate_limit:
+  enabled: false
+
+logging:
+  events_path: "rampart-benchmark-events.jsonl"

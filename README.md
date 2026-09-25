@@ -33,4 +33,24 @@ required to run the core firewall.
 
 ## Quick start
 
-Not yet available — Phase 1 (network-layer core) is in progress.
+```sh
+go build -o bin/rampart ./cmd/rampart
+cp configs/rampart.example.yaml configs/rampart.yaml
+# edit configs/rampart.yaml: set upstream to the app you're protecting
+./bin/rampart -config configs/rampart.yaml
+```
+
+Rampart listens on `listen` (default `:8080`) and proxies allowed traffic to
+`upstream`. Every block decision (IP filter, rate limit, or WAF) is written
+as a JSON line to `logging.events_path`.
+
+## Progress
+
+- [x] **Phase 1** — network-layer core (reverse proxy, IP allow/deny, rate limiting, event log)
+- [x] **Phase 2** — application WAF (Coraza + OWASP CRS, custom SecLang rules, verified live against OWASP Juice Shop). See [benchmarks/](benchmarks/) for GoTestWAF results.
+- [ ] Phase 3 — API / mobile-backend abuse detection
+- [ ] Phase 4 — attack analytics dashboard
+- [ ] Phase 5 — cloud-native packaging
+- [ ] Phase 6 — community release
+
+Full detail in [docs/ROADMAP.md](docs/ROADMAP.md).
