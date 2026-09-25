@@ -1,0 +1,30 @@
+# Example values exercising every optional feature — a reference, not a
+# starting point to copy wholesale. `helm template` this against
+# values.yaml's defaults to see exactly what each option changes.
+upstream: "http://myapp.default.svc.cluster.local:8080"
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "rampart.example.com"
+apiAbuse:
+  enabled: true
+  rules:
+    - name: "login-brute-force"
+      methods: ["POST"]
+      pathPrefix: "/login"
+      failureStatusCodes: [401]
+      maxFailures: 5
+      window: 1m
+      blockDuration: 5m
+schemaValidation:
+  enabled: true
+  rules:
+    - methods: ["POST"]
+      pathPrefix: "/login"
+      schemaFile: "login.json"
+schemas:
+  login.json: |
+    {"type": "object"}
+customWafRules:
+  01-example.conf: |
+    SecRule REQUEST_URI "@beginsWith /internal-admin/" "id:1000001,phase:1,deny,status:404,log"

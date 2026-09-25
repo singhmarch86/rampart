@@ -1,0 +1,97 @@
+image:
+  repository: rampart
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# The application Rampart protects. Required — there is no sensible default.
+# For an in-cluster app: http://<service-name>.<namespace>.svc.cluster.local:<port>
+upstream: ""
+
+service:
+  type: ClusterIP
+  proxyPort: 8080
+  dashboardPort: 9090
+
+# Standard Kubernetes Ingress in front of Rampart's proxy port — this is
+# what "ingress mode" means for this chart: Rampart sits behind your
+# cluster's existing ingress controller like any other backend Service. It
+# does NOT implement a custom Ingress controller.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: ""
+  tls: []
+
+# The dashboard has no authentication of its own yet (see docs/ROADMAP.md
+# in the main repo). Leave this disabled unless you're putting an
+# authenticating proxy in front of it — do not expose it via the ingress
+# above.
+dashboardIngress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: ""
+  tls: []
+
+waf:
+  enabled: true
+  mode: block
+
+rateLimit:
+  enabled: true
+  requestsPerSecond: 10
+  burst: 20
+  maxConcurrentPerIP: 50
+  idleTimeout: 10m
+
+apiAbuse:
+  enabled: false
+  rules: []
+  # - name: "login-brute-force"
+  #   methods: ["POST"]
+  #   pathPrefix: "/rest/user/login"
+  #   failureStatusCodes: [401]
+  #   maxFailures: 5
+  #   window: 1m
+  #   blockDuration: 5m
+
+schemaValidation:
+  enabled: false
+  rules: []
+
+dashboard:
+  enabled: true
+
+# Custom SecLang rules (see configs/waf-custom-rules in the main repo for
+# examples), keyed by filename, rendered into a ConfigMap and mounted
+# read-only. Loaded after the OWASP Core Rule Set, sorted by filename.
+customWafRules: {}
+# 01-example.conf: |
+#   SecRule REQUEST_URI "@beginsWith /internal-admin/" "id:1000001,phase:1,deny,status:404,log"
+
+# JSON Schema files for schemaValidation.rules, keyed by filename.
+schemas: {}
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

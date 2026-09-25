@@ -1,0 +1,29 @@
+Rampart is deployed as {{ include "rampart.fullname" . }}.
+
+Proxy: {{ .Release.Name }}-rampart:{{ .Values.service.proxyPort }} (in-cluster)
+{{- if .Values.ingress.enabled }}
+  Externally: http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else }}
+  Not exposed via Ingress. Port-forward to check it:
+    kubectl port-forward svc/{{ include "rampart.fullname" . }} 8080:{{ .Values.service.proxyPort }}
+{{- end }}
+
+{{- if .Values.dashboard.enabled }}
+
+Dashboard: {{ .Release.Name }}-rampart:{{ .Values.service.dashboardPort }} (in-cluster)
+{{- if .Values.dashboardIngress.enabled }}
+  WARNING: dashboardIngress is enabled, exposing the attack-analytics
+  dashboard externally. It has no authentication of its own — make sure
+  your ingress annotations add one (e.g. nginx.ingress.kubernetes.io/auth-type)
+  before this reaches anything but a trusted network.
+{{- else }}
+  Not exposed. Port-forward to check it:
+    kubectl port-forward svc/{{ include "rampart.fullname" . }} 9090:{{ .Values.service.dashboardPort }}
+{{- end }}
+{{- end }}
+
+{{- if not .Values.upstream }}
+
+WARNING: `upstream` is not set. Rampart will proxy to nothing useful until
+you set it in your values file.
+{{- end }}

@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rampart.fullname" . }}-config
+  labels:
+    {{- include "rampart.labels" . | nindent 4 }}
+data:
+  rampart.yaml: |
+    listen: ":{{ .Values.service.proxyPort }}"
+    upstream: {{ .Values.upstream | quote }}
+
+    firewall:
+      allow: []
+      deny: []
+
+    waf:
+      enabled: {{ .Values.waf.enabled }}
+      mode: {{ .Values.waf.mode | quote }}
+      custom_rules_dir: {{ if .Values.customWafRules }}"/app/configs/waf-custom-rules"{{ else }}""{{ end }}
+
+    api_abuse:
+      enabled: {{ .Values.apiAbuse.enabled }}
+      rules:
+      {{- range .Values.apiAbuse.rules }}
+        - name: {{ .name | quote }}
+          methods: {{ .methods | toJson }}
+          path_prefix: {{ .pathPrefix | quote }}
+          failure_status_codes: {{ .failureStatusCodes | toJson }}
+          max_failures: {{ .maxFailures }}
+          window: {{ .window | quote }}
+          block_duration: {{ .blockDuration | quote }}
+      {{- end }}
+
+    schema_validation:
+      enabled: {{ .Values.schemaValidation.enabled }}
+      rules:
+      {{- range .Values.schemaValidation.rules }}
+        - methods: {{ .methods | toJson }}
+          path_prefix: {{ .pathPrefix | quote }}
+          schema_file: "/app/configs/schemas/{{ .schemaFile }}"
+      {{- end }}
+
+    rate_limit:
+      enabled: {{ .Values.rateLimit.enabled }}
+      requests_per_second: {{ .Values.rateLimit.requestsPerSecond }}
+      burst: {{ .Values.rateLimit.burst }}
+      max_concurrent_per_ip: {{ .Values.rateLimit.maxConcurrentPerIP }}
+      idle_timeout: {{ .Values.rateLimit.idleTimeout | quote }}
+
+    dashboard:
+      enabled: {{ .Values.dashboard.enabled }}
+      listen: "0.0.0.0:{{ .Values.service.dashboardPort }}"
+
+    logging:
+      events_path: "/data/rampart-events.jsonl"
+---
+{{- if .Values.customWafRules }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rampart.fullname" . }}-waf-rules
+  labels:
+    {{- include "rampart.labels" . | nindent 4 }}
+data:
+  {{- toYaml .Values.customWafRules | nindent 2 }}
+{{- end }}
+---
+{{- if .Values.schemas }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rampart.fullname" . }}-schemas
+  labels:
+    {{- include "rampart.labels" . | nindent 4 }}
+data:
+  {{- toYaml .Values.schemas | nindent 2 }}
+{{- end }}

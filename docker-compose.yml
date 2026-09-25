@@ -1,0 +1,43 @@
+# One-command demo stack: Rampart in front of OWASP Juice Shop.
+#
+#   docker compose up
+#
+# Then attack it at http://localhost:8080 and watch the dashboard at
+# http://localhost:9090. Uses configs/rampart.compose.yaml (tracked in git,
+# unlike your own configs/rampart.yaml) so this works on a fresh clone with
+# no setup step.
+#
+# To point this at your own app instead of Juice Shop: copy
+# configs/rampart.compose.yaml to configs/rampart.local.yaml, edit
+# `upstream`, then run `docker compose run --rm -v
+# ./configs/rampart.local.yaml:/app/configs/rampart.yaml:ro rampart` — or
+# just run the Docker image directly per the README, which is simpler for
+# a one-off. This compose file's job is the zero-setup demo, not being a
+# general-purpose deployment tool.
+
+services:
+  rampart:
+    build: .
+    ports:
+      - "8080:8080"
+      # Dashboard bound to loopback only — it has no auth of its own yet.
+      # Do not change this to "9090:9090" (which would bind 0.0.0.0)
+      # without putting an authenticating reverse proxy in front of it.
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./configs/rampart.compose.yaml:/app/configs/rampart.yaml:ro
+      - ./configs/waf-custom-rules:/app/configs/waf-custom-rules:ro
+      - ./configs/schemas:/app/configs/schemas:ro
+      - rampart-data:/data
+    depends_on:
+      - juice-shop
+    restart: unless-stopped
+
+  juice-shop:
+    image: bkimminich/juice-shop
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  rampart-data:

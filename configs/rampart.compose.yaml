@@ -1,0 +1,54 @@
+# Config used by docker-compose.yml. Tracked in git (unlike configs/rampart.yaml,
+# which is your own local copy) so `docker compose up` works on a fresh clone
+# with no setup step. Points at the bundled Juice Shop demo target.
+#
+# To point this stack at your own app instead: edit `upstream` below to
+# http://host.docker.internal:<port> (macOS/Windows) or your app's
+# container/service name if it's on this compose network, then
+# `docker compose up rampart` (the juice-shop service is harmless to leave
+# running alongside, or comment it out in docker-compose.yml).
+listen: ":8080"
+upstream: "http://juice-shop:3000"
+
+firewall:
+  allow: []
+  deny: []
+
+waf:
+  enabled: true
+  mode: "block"
+  custom_rules_dir: "/app/configs/waf-custom-rules"
+
+api_abuse:
+  enabled: true
+  rules:
+    - name: "login-brute-force"
+      methods: ["POST"]
+      path_prefix: "/rest/user/login"
+      failure_status_codes: [401]
+      max_failures: 5
+      window: 1m
+      block_duration: 5m
+
+schema_validation:
+  enabled: true
+  rules:
+    - methods: ["POST"]
+      path_prefix: "/rest/user/login"
+      schema_file: "/app/configs/schemas/login.json"
+
+rate_limit:
+  enabled: true
+  requests_per_second: 10
+  burst: 20
+  max_concurrent_per_ip: 50
+  idle_timeout: 10m
+
+dashboard:
+  enabled: true
+  listen: "0.0.0.0:9090"
+
+logging:
+  # /data is the writable volume in the container image (see Dockerfile) —
+  # /app is read-only. Mount a volume at /data to persist this across restarts.
+  events_path: "/data/rampart-events.jsonl"

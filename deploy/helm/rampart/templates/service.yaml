@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rampart.fullname" . }}
+  labels:
+    {{- include "rampart.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "rampart.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: proxy
+      port: {{ .Values.service.proxyPort }}
+      targetPort: proxy
+    {{- if .Values.dashboard.enabled }}
+    - name: dashboard
+      port: {{ .Values.service.dashboardPort }}
+      targetPort: dashboard
+    {{- end }}

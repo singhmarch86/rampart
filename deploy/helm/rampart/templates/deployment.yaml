@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rampart.fullname" . }}
+  labels:
+    {{- include "rampart.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "rampart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rampart.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      securityContext:
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+      containers:
+        - name: rampart
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-config", "/app/configs/rampart.yaml"]
+          securityContext:
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            capabilities:
+              {{- toYaml .Values.securityContext.capabilities | nindent 14 }}
+          ports:
+            - name: proxy
+              containerPort: {{ .Values.service.proxyPort }}
+            {{- if .Values.dashboard.enabled }}
+            - name: dashboard
+              containerPort: {{ .Values.service.dashboardPort }}
+            {{- end }}
+          readinessProbe:
+            tcpSocket:
+              port: proxy
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: proxy
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/configs/rampart.yaml
+              subPath: rampart.yaml
+              readOnly: true
+            {{- if .Values.customWafRules }}
+            - name: waf-rules
+              mountPath: /app/configs/waf-custom-rules
+              readOnly: true
+            {{- end }}
+            {{- if .Values.schemas }}
+            - name: schemas
+              mountPath: /app/configs/schemas
+              readOnly: true
+            {{- end }}
+            # readOnlyRootFilesystem means /data (the only path Rampart
+            # writes to — see the Dockerfile in the main repo) needs its
+            # own writable volume; emptyDir is fine since the event log
+            # here is a live-tail source for the dashboard, not the
+            # durable record you'd build alerting on — pair this chart
+            # with your cluster's log shipping if you need that.
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "rampart.fullname" . }}-config
+        {{- if .Values.customWafRules }}
+        - name: waf-rules
+          configMap:
+            name: {{ include "rampart.fullname" . }}-waf-rules
+        {{- end }}
+        {{- if .Values.schemas }}
+        - name: schemas
+          configMap:
+            name: {{ include "rampart.fullname" . }}-schemas
+        {{- end }}
+        - name: data
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

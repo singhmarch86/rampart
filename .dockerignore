@@ -1,0 +1,11 @@
+.git
+bin/
+dist/
+*.log
+*.jsonl
+configs/rampart.yaml
+configs/rampart.benchmark.yaml
+benchmarks/reports/
+benchmarks/reports-baseline/
+deploy/
+docs/
