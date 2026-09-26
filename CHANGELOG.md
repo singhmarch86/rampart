@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.1 — hardening pass
+
+Two real gaps closed, both verified live against a real Keycloak instance
+(see [docs/FINDINGS.md](docs/FINDINGS.md) #7 and [docs/OIDC.md](docs/OIDC.md)):
+
+- **Dashboard rate limiting**: the dashboard's HTTP server (including
+  `/auth/login`/`/auth/callback` under OIDC dashboard auth) previously had
+  no rate limiting of its own, unlike the main proxy. Fixed via a new
+  `dashboard.rate_limit` config and a reusable `ratelimit.Middleware`.
+- **RP-initiated logout**: `/auth/logout` now ends the IdP's own session
+  too (via `end_session_endpoint` + `id_token_hint`) when the provider
+  supports it, not just Rampart's local session cookie.
+
 ## v0.1.0 — initial release
 
 First public release. All of the following is implemented, tested, and
