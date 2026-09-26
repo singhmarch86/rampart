@@ -11,6 +11,72 @@ Entries are newest first.
 
 ---
 
+## 8. Rampart had never pointed a scanner at its own Go source
+
+**Found:** All seven findings above came from behavioral testing — a WAF
+benchmark, a live login flow against real Keycloak, driving a real browser.
+None came from static analysis or dependency scanning of Rampart's own
+code, which is a real gap for a security tool to have. Ran `govulncheck`
+(known CVEs, filtered to ones actually reachable from Rampart's call
+graph) and `gosec` (Go-specific security anti-patterns) for the first time.
+
+**govulncheck: 7 reachable vulnerabilities, all in the Go standard library
+itself** (`net/url` quadratic-complexity, `crypto/tls` post-handshake and
+ECH issues, `net/http` missing `ReadHeaderTimeout` on the HTTP/2 upgrade
+path, `encoding/xml` and `encoding/asn1` missing recursion-depth guards,
+and a `golang.org/x/net/idna` Punycode-validation gap) — every one already
+fixed in a later Go/module patch release; this was a stale toolchain and a
+stale `golang.org/x/net`, not a code bug.
+
+**gosec: 7 findings, of which 2 were real and 5 were false positives**
+gosec can't statically resolve whether a file path or a boolean came from
+a request or from the operator's own config — it flags both the same way:
+- **Real: `internal/events/events.go` opened its event log at `0o644`.**
+  That file records attack traffic detail (source IPs, request paths);
+  tightened to `0o600`.
+- **Real: `internal/proxy/proxy.go`'s error handler logged
+  `r.Method`/`r.URL.Path` with `%s` (CWE-117, log injection).**
+  `r.URL.Path` is already percent-decoded, so a request path like
+  `/foo%0d%0aFAKE-LOG-LINE` arrives containing a literal CR/LF — logged
+  with `%s` that forges a second, fake log line in whatever reads
+  Rampart's stdout/stderr. Switched to `%q`; verified with a standalone
+  repro that `%q` renders an embedded `\r\n` as the two-character escape
+  sequence `\r\n` in the output, not a real line break.
+- **False positive (G124, ×2):** `internal/oidcauth/session.go`'s two
+  `http.Cookie` literals already set `HttpOnly: true`, `Secure: sm.secure`,
+  and `SameSite: http.SameSiteLaxMode` — gosec flags this because
+  `sm.secure` is a field read, not a literal `true`, and can't statically
+  verify `NewSessionManager` always sets it `true` outside tests.
+- **False positive (G304, ×3):** `internal/config/config.go`'s config-file
+  path, `internal/events/events.go`'s log path, and
+  `internal/waf/waf.go`'s custom-rules directory are all operator-supplied
+  (CLI flag or config file) at process startup, never from a request —
+  gosec's path-traversal check can't distinguish that from a genuinely
+  attacker-reachable path.
+
+All five false positives are suppressed with an inline `#nosec` comment
+naming the specific rule and explaining why, rather than disabling the
+rule wholesale — so a *new* G304/G124 finding elsewhere still surfaces.
+
+**The fix:**
+- `go get go@1.26.6` (auto-upgraded further to `go1.26.8`) and `go get
+  golang.org/x/net@latest` to clear the standard-library and dependency
+  CVEs.
+- `0o600` file permission for the event log
+  ([internal/events/events.go](../internal/events/events.go)).
+- `%q` instead of `%s` for request-derived values in the proxy's error log
+  ([internal/proxy/proxy.go](../internal/proxy/proxy.go)).
+- Five `#nosec`-annotated false positives, each with an inline reason.
+- Added a `security` job to CI (`.github/workflows/ci.yml`) running both
+  scanners on every push, so this doesn't silently regress.
+
+**Verified:** `govulncheck ./...` → "No vulnerabilities found." `gosec
+./...` → 0 issues, 6 nosec (5 suppressions plus the log-injection line,
+which carries its own suppression once the `%q` fix was verified). `go
+build`, `go vet`, and `go test -race ./...` all pass unchanged.
+
+---
+
 ## 7. Dashboard server had no rate limiting of its own
 
 **Found:** During a deliberate hardening pass (not live-triggered by a test

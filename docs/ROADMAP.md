@@ -12,6 +12,7 @@
 | 6. Community release | CI, security disclosure policy, contribution docs, issue/PR templates, launch materials — **done** |
 | 7. Hosted Console (paid tier) | Separate SaaS build: multi-node fleet management, longer retention, threat-intel feed. Not started. |
 | 7.5 Hardening pass | RP-initiated logout, dashboard rate limiting — **done**, see docs/FINDINGS.md #7 and docs/OIDC.md |
+| 7.6 Self-scan | `govulncheck` + `gosec` against Rampart's own Go source, wired into CI — **done**, see docs/FINDINGS.md #8 |
 
 ## Known limitations (tracked, not yet implemented)
 

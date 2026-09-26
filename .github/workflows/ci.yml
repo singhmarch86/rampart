@@ -35,6 +35,32 @@ jobs:
       - name: Test (race detector)
         run: go test -race ./...
 
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+
+      # Checks the standard library and dependencies for known CVEs
+      # reachable from Rampart's own call graph (see docs/FINDINGS.md #8).
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+      # Static analysis for Go-specific security anti-patterns (see
+      # docs/FINDINGS.md #8). Findings that are false positives for this
+      # codebase are suppressed inline with a #nosec comment explaining why,
+      # not by loosening this check.
+      - name: gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec ./...
+
   docker-build:
     runs-on: ubuntu-latest
     steps:

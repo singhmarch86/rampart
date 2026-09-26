@@ -113,6 +113,9 @@ func loadCustomRules(dir string) (string, error) {
 
 	var sb strings.Builder
 	for _, name := range names {
+		// #nosec G304 -- name comes from os.ReadDir(dir) above, an operator-
+		// controlled rules directory from the config file, not from a
+		// request; not attacker-reachable.
 		data, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
 			return "", fmt.Errorf("reading %s: %w", name, err)

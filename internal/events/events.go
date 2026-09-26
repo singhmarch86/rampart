@@ -48,7 +48,11 @@ func NewLogger(path string) (*Logger, error) {
 		l.out = nopWriteCloser{io.Discard}
 		return l, nil
 	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	// 0o600: this file records attack traffic detail (source IPs, request
+	// paths), so it shouldn't be group/world-readable by default.
+	// #nosec G304 -- path is Logging.EventsPath from the operator's own
+	// config file, set at process start, not from a request.
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return nil, err
 	}

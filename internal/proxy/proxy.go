@@ -55,7 +55,15 @@ func New(cfg config.Config, logger *events.Logger) (*Proxy, error) {
 
 	reverseProxy := httputil.NewSingleHostReverseProxy(upstreamURL)
 	reverseProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		log.Printf("proxy: upstream error for %s %s: %v", r.Method, r.URL.Path, err)
+		// %q, not %s: r.Method and r.URL.Path are attacker-controlled and
+		// r.URL.Path is already percent-decoded, so a path like
+		// "/foo%0d%0aFAKE-LOG-LINE" arrives containing a real CR/LF —
+		// logged with %s that forges a second log line; %q escapes it
+		// (verified: %q renders an embedded \r\n as the literal two-byte
+		// escape sequence, not a real line break).
+		// #nosec G706 -- gosec's taint check doesn't account for %q
+		// escaping; the CR/LF this rule warns about can't survive %q.
+		log.Printf("proxy: upstream error for %q %q: %v", r.Method, r.URL.Path, err)
 		w.WriteHeader(http.StatusBadGateway)
 	}
 

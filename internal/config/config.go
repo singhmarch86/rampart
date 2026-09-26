@@ -241,6 +241,8 @@ func Default() Config {
 func Load(path string) (Config, error) {
 	cfg := Default()
 
+	// #nosec G304 -- path is the -config CLI flag the operator passes at
+	// startup, not from a request.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return cfg, fmt.Errorf("reading config %s: %w", path, err)

@@ -62,6 +62,9 @@ func (sm *SessionManager) Create(w http.ResponseWriter, subject string, roles []
 	if err != nil {
 		return err
 	}
+	// #nosec G124 -- HttpOnly, Secure, and SameSite are all set; gosec
+	// can't statically resolve sm.secure (always true outside tests, see
+	// its field comment) to a literal so it flags this anyway.
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    sm.sign(payload),
@@ -126,6 +129,7 @@ func (sm *SessionManager) parse(cookieValue string) (*Session, error) {
 }
 
 func (sm *SessionManager) Clear(w http.ResponseWriter) {
+	// #nosec G124 -- see the identical suppression in Create above.
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    "",
