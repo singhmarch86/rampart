@@ -1,0 +1,41 @@
+name: Bug report
+description: Something isn't working as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities (WAF/auth bypass, privilege escalation, DoS), use the private
+        vulnerability report (Security tab) instead — see SECURITY.md. This form is for regular bugs.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Config snippet + request(s) that trigger it, if applicable.
+      placeholder: |
+        Config:
+        ```yaml
+        waf:
+          enabled: true
+        ```
+        Request: curl ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Rampart version / commit
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / event log entries
+      render: shell

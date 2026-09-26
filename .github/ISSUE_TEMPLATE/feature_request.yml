@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest something Rampart should do
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: What are you trying to do that Rampart doesn't support today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: If you have one in mind. Check docs/ROADMAP.md first — it might already be planned.
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer does this touch?
+      options:
+        - Network (IP filtering, rate limiting)
+        - Application WAF
+        - API abuse / schema validation
+        - OIDC / RBAC
+        - Analytics dashboard
+        - Deployment (Docker/Helm/Terraform)
+        - Other
+    validations:
+      required: true

@@ -1,5 +1,8 @@
 # Rampart
 
+[![CI](https://github.com/gauravdeepsingh/rampart/actions/workflows/ci.yml/badge.svg)](https://github.com/gauravdeepsingh/rampart/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
 A self-hosted, open-core firewall and attack-analytics platform. Rampart sits
 in front of your application as a reverse proxy and blocks network-, application-,
 and API-layer attacks in one place, then gives you a single dashboard to see
@@ -55,6 +58,13 @@ as a JSON line to `logging.events_path`.
 - [x] **Phase 4** — live attack-analytics dashboard (`dashboard.enabled`): top attacker IPs, top block reasons, a per-minute timeline, and a live event feed over Server-Sent Events. Runs on its own port (no auth yet, so keep it off a public interface — see the config comments). Verified live in a browser against real multi-layer traffic.
 - [x] **Phase 5** — cloud-native packaging: Docker image (distroless, non-root), `docker compose` demo stack, a Helm chart (standalone/sidecar/ingress patterns, `helm lint`+`helm template` verified), and a Terraform module for AWS ECS Fargate. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 - [x] **OIDC integration** (`oidc.*`) — dashboard login and API role/permission enforcement against an existing IdP. Verified live against a real Keycloak instance (full browser-based Authorization Code + PKCE flow, real realm/client/roles/user), not just mocks. See [docs/OIDC.md](docs/OIDC.md).
-- [ ] Phase 6 — community release
+- [x] **Phase 6** — community release: CI (build/vet/test-race/gofmt/Helm lint on every push), [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), issue/PR templates, [CHANGELOG.md](CHANGELOG.md).
 
 Full detail in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Community
+
+- **Found a bug?** [Open an issue](../../issues/new/choose).
+- **Found a security vulnerability?** Do *not* open a public issue — see [SECURITY.md](SECURITY.md).
+- **Want to contribute?** See [CONTRIBUTING.md](CONTRIBUTING.md).
+- Governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
