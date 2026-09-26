@@ -17,6 +17,7 @@ import (
 	"github.com/gauravdeepsingh/rampart/internal/events"
 	"github.com/gauravdeepsingh/rampart/internal/oidcauth"
 	"github.com/gauravdeepsingh/rampart/internal/proxy"
+	"github.com/gauravdeepsingh/rampart/internal/ratelimit"
 )
 
 func main() {
@@ -55,6 +56,7 @@ func main() {
 
 	var dashboardServer *http.Server
 	var analyticsStore *analytics.Store
+	var dashboardLimiter *ratelimit.Limiter
 	if cfg.Dashboard.Enabled {
 		analyticsStore = analytics.New(logger)
 		dashboardHandler := analytics.NewServer(analyticsStore).Handler()
@@ -73,6 +75,20 @@ func main() {
 			mux.Handle("/", dashAuth.RequireAuth(dashboardHandler))
 			dashboardHandler = mux
 			log.Printf("dashboard requires OIDC login (issuer: %s)", cfg.OIDC.IssuerURL)
+		}
+
+		// The dashboard server previously had no rate limiting of its own at
+		// all - the main proxy chain gets it, but this is a separate
+		// http.Server that never passed through that chain. Found during a
+		// hardening pass, not live-caught; see finding #7 in docs/FINDINGS.md.
+		if cfg.Dashboard.RateLimit.Enabled {
+			dashboardLimiter = ratelimit.New(
+				cfg.Dashboard.RateLimit.RequestsPerSecond,
+				cfg.Dashboard.RateLimit.Burst,
+				cfg.Dashboard.RateLimit.MaxConcurrentPerIP,
+				cfg.Dashboard.RateLimit.IdleTimeout,
+			)
+			dashboardHandler = ratelimit.Middleware(dashboardLimiter, "dashboard-ratelimit", logger, dashboardHandler)
 		}
 
 		dashboardServer = &http.Server{
@@ -105,5 +121,8 @@ func main() {
 	}
 	if analyticsStore != nil {
 		analyticsStore.Close()
+	}
+	if dashboardLimiter != nil {
+		dashboardLimiter.Close()
 	}
 }

@@ -22,8 +22,14 @@ var (
 // Session is what's encoded (signed, not encrypted — don't put secrets in
 // here) into the session cookie.
 type Session struct {
-	Subject string    `json:"sub"`
-	Roles   []string  `json:"roles"`
+	Subject string   `json:"sub"`
+	Roles   []string `json:"roles"`
+	// IDToken is kept only so logout can pass it as id_token_hint to the
+	// IdP's end_session_endpoint (RP-Initiated Logout) — it's not used for
+	// any authorization decision, Subject/Roles are. Kept empty if the
+	// provider doesn't do RP-initiated logout, so nothing sensitive sits
+	// in the cookie unnecessarily.
+	IDToken string    `json:"idt,omitempty"`
 	Expiry  time.Time `json:"exp"`
 }
 
@@ -50,8 +56,8 @@ func (sm *SessionManager) sign(payload []byte) string {
 	return base64.RawURLEncoding.EncodeToString(payload) + "." + base64.RawURLEncoding.EncodeToString(sig)
 }
 
-func (sm *SessionManager) Create(w http.ResponseWriter, subject string, roles []string) error {
-	sess := Session{Subject: subject, Roles: roles, Expiry: time.Now().Add(sm.duration)}
+func (sm *SessionManager) Create(w http.ResponseWriter, subject string, roles []string, rawIDToken string) error {
+	sess := Session{Subject: subject, Roles: roles, IDToken: rawIDToken, Expiry: time.Now().Add(sm.duration)}
 	payload, err := json.Marshal(sess)
 	if err != nil {
 		return err

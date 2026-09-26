@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -50,9 +51,26 @@ type DashboardAuth struct {
 	requiredRoles       []string
 	rolesClaim          string
 	logger              *events.Logger
+	// endSessionEndpoint enables RP-initiated logout (OIDC's standard,
+	// though not universally implemented, mechanism for also ending the
+	// IdP's own session). Empty if the provider doesn't advertise one in
+	// its discovery document, in which case logout falls back to clearing
+	// only Rampart's local session — see handleLogout.
+	endSessionEndpoint    string
+	postLogoutRedirectURL string
+}
+
+// providerMetadata pulls fields from OIDC discovery that go-oidc's Provider
+// doesn't expose directly — end_session_endpoint is a widely-supported
+// but non-core-spec extension (RP-Initiated Logout 1.0).
+type providerMetadata struct {
+	EndSessionEndpoint string `json:"end_session_endpoint"`
 }
 
 func NewDashboardAuth(provider *oidc.Provider, cfg config.DashboardAuthConfig, rolesClaim string, logger *events.Logger) *DashboardAuth {
+	var meta providerMetadata
+	_ = provider.Claims(&meta) // best-effort; missing end_session_endpoint just disables RP-initiated logout
+
 	return &DashboardAuth{
 		oauth2Config: oauth2.Config{
 			ClientID:     cfg.ClientID,
@@ -61,13 +79,15 @@ func NewDashboardAuth(provider *oidc.Provider, cfg config.DashboardAuthConfig, r
 			Endpoint:     provider.Endpoint(),
 			Scopes:       cfg.Scopes,
 		},
-		accessTokenVerifier: provider.Verifier(&oidc.Config{SkipClientIDCheck: true}),
-		verifier:            provider.Verifier(&oidc.Config{ClientID: cfg.ClientID}),
-		sessions:            NewSessionManager(cfg.SessionSecret, cfg.SessionDuration),
-		stateSecret:         []byte(cfg.SessionSecret),
-		requiredRoles:       cfg.RequiredRoles,
-		rolesClaim:          rolesClaim,
-		logger:              logger,
+		accessTokenVerifier:   provider.Verifier(&oidc.Config{SkipClientIDCheck: true}),
+		verifier:              provider.Verifier(&oidc.Config{ClientID: cfg.ClientID}),
+		sessions:              NewSessionManager(cfg.SessionSecret, cfg.SessionDuration),
+		stateSecret:           []byte(cfg.SessionSecret),
+		requiredRoles:         cfg.RequiredRoles,
+		rolesClaim:            rolesClaim,
+		logger:                logger,
+		endSessionEndpoint:    meta.EndSessionEndpoint,
+		postLogoutRedirectURL: cfg.PostLogoutRedirectURL,
 	}
 }
 
@@ -179,16 +199,42 @@ func (d *DashboardAuth) handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := d.sessions.Create(w, idToken.Subject, roles); err != nil {
+	if err := d.sessions.Create(w, idToken.Subject, roles, rawIDToken); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
+// handleLogout always clears Rampart's own session. If the provider
+// advertises an end_session_endpoint (RP-Initiated Logout), it also
+// redirects there so the IdP's session ends too — without this, a user
+// could "log out" of the dashboard and immediately get silently
+// re-authenticated via the IdP's still-active SSO session on next visit.
 func (d *DashboardAuth) handleLogout(w http.ResponseWriter, r *http.Request) {
+	sess, _ := d.sessions.Verify(r) // best-effort: still log out even if the session is already gone/invalid
 	d.sessions.Clear(w)
-	http.Redirect(w, r, "/", http.StatusFound)
+
+	if d.endSessionEndpoint == "" {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
+	endSessionURL, err := url.Parse(d.endSessionEndpoint)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	q := endSessionURL.Query()
+	q.Set("client_id", d.oauth2Config.ClientID)
+	if d.postLogoutRedirectURL != "" {
+		q.Set("post_logout_redirect_uri", d.postLogoutRedirectURL)
+	}
+	if sess != nil && sess.IDToken != "" {
+		q.Set("id_token_hint", sess.IDToken)
+	}
+	endSessionURL.RawQuery = q.Encode()
+	http.Redirect(w, r, endSessionURL.String(), http.StatusFound)
 }
 
 // --- auth-state cookie (short-lived, separate from the login session) ---

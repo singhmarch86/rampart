@@ -11,7 +11,7 @@ func TestSessionRoundTrip(t *testing.T) {
 	sm := NewSessionManager("test-secret-at-least-32-bytes-long", time.Hour)
 
 	rec := httptest.NewRecorder()
-	if err := sm.Create(rec, "alice", []string{"admin"}); err != nil {
+	if err := sm.Create(rec, "alice", []string{"admin"}, "raw-id-token-value"); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 
@@ -30,6 +30,9 @@ func TestSessionRoundTrip(t *testing.T) {
 	if len(sess.Roles) != 1 || sess.Roles[0] != "admin" {
 		t.Fatalf("expected roles [admin], got %v", sess.Roles)
 	}
+	if sess.IDToken != "raw-id-token-value" {
+		t.Fatalf("expected IDToken to round-trip for logout's id_token_hint, got %q", sess.IDToken)
+	}
 }
 
 func TestSessionNoCookie(t *testing.T) {
@@ -43,7 +46,7 @@ func TestSessionNoCookie(t *testing.T) {
 func TestSessionTamperedPayloadRejected(t *testing.T) {
 	sm := NewSessionManager("test-secret-at-least-32-bytes-long", time.Hour)
 	rec := httptest.NewRecorder()
-	_ = sm.Create(rec, "alice", []string{"viewer"})
+	_ = sm.Create(rec, "alice", []string{"viewer"}, "")
 	cookie := rec.Result().Cookies()[0]
 
 	// Tamper: swap the first base64url character for a different valid
@@ -68,7 +71,7 @@ func TestSessionWrongSecretRejected(t *testing.T) {
 	sm2 := NewSessionManager("secret-two-at-least-32-bytes-long!!", time.Hour)
 
 	rec := httptest.NewRecorder()
-	_ = sm1.Create(rec, "alice", nil)
+	_ = sm1.Create(rec, "alice", nil, "")
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	for _, c := range rec.Result().Cookies() {
 		req.AddCookie(c)
@@ -82,7 +85,7 @@ func TestSessionWrongSecretRejected(t *testing.T) {
 func TestSessionExpired(t *testing.T) {
 	sm := NewSessionManager("test-secret-at-least-32-bytes-long", -time.Hour) // already expired
 	rec := httptest.NewRecorder()
-	_ = sm.Create(rec, "alice", nil)
+	_ = sm.Create(rec, "alice", nil, "")
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	for _, c := range rec.Result().Cookies() {
 		req.AddCookie(c)

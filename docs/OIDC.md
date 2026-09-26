@@ -56,11 +56,30 @@ puts roles on.
 Visiting the dashboard now redirects to Keycloak's login page; after
 login, users without the required role get a 403, not the dashboard.
 
-**Note:** logout (`/auth/logout`) clears Rampart's own session cookie but
-does not perform RP-initiated logout against the IdP — if your IdP session
-is still active, visiting the dashboard again may silently re-authenticate
-without showing a login form. This is a known scope limitation, not
-implemented yet.
+### Logout
+
+`/auth/logout` clears Rampart's own session cookie, and — if the provider
+advertises an `end_session_endpoint` in its discovery document (Keycloak
+and most modern providers do) — also redirects there to end the IdP's own
+session (RP-Initiated Logout), passing `id_token_hint` so the IdP doesn't
+need a confirmation page. Set `oidc.dashboard_auth.post_logout_redirect_url`
+to where the IdP should send the browser back afterward.
+
+**Keycloak-specific gotcha, found while testing this:** the post-logout
+redirect URI is *not* a top-level field on the client — the Admin REST API
+rejects `postLogoutRedirectUris` outright. It has to go under the client's
+`attributes` map instead:
+```json
+{"attributes": {"post.logout.redirect.uris": "http://localhost:9090/*"}}
+```
+In the Keycloak admin console UI this is just another entry in the client's
+"Valid post logout redirect URIs" field — the REST API's field name is just
+non-obvious.
+
+If the provider doesn't advertise an `end_session_endpoint`, logout falls
+back to only clearing Rampart's local session — the IdP session may remain
+active, and a later visit could silently re-authenticate via SSO without
+showing a login form.
 
 ## API RBAC walkthrough
 
@@ -85,6 +104,18 @@ This expects the access token to be a JWT signed by the issuer (true of
 Keycloak and most modern providers). A provider issuing opaque access
 tokens would need token-introspection support instead, which isn't
 implemented here.
+
+## Dashboard rate limiting
+
+`dashboard.rate_limit` protects the dashboard's own port — including
+`/auth/login` and `/auth/callback` when OIDC dashboard auth is enabled —
+the same way `rate_limit` protects the main proxy. This was missing
+entirely until a hardening pass caught it (finding #7 in
+[FINDINGS.md](FINDINGS.md)): the dashboard is a separate `http.Server`
+that was never threaded through the same middleware as the main proxy
+chain. Defaults are tighter than the main proxy's (5 req/s, burst 10) since
+dashboard traffic is normally low-volume, but generous enough for the
+live event stream (`/api/stream`) to hold its connection open.
 
 ## Session model
 

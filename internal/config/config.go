@@ -110,13 +110,19 @@ type LoggingConfig struct {
 	EventsPath string `yaml:"events_path"`
 }
 
-// DashboardConfig serves the live attack-analytics dashboard. It has no
-// authentication of its own yet, so it's deliberately a separate listener
-// from the public proxy port — see docs/ROADMAP.md.
+// DashboardConfig serves the live attack-analytics dashboard. Without
+// oidc.dashboard_auth it has no authentication of its own, so it's
+// deliberately a separate listener from the public proxy port — see
+// docs/ROADMAP.md.
 type DashboardConfig struct {
 	Enabled bool `yaml:"enabled"`
 	// Listen is the dashboard's own address, separate from the proxy's `listen`.
 	Listen string `yaml:"listen"`
+	// RateLimit protects the dashboard's own port (login/callback endpoints,
+	// the SSE stream) - found missing entirely during a hardening pass, since
+	// the dashboard server was never wired through the same rate-limit
+	// middleware the main proxy chain gets. See finding #7 in docs/FINDINGS.md.
+	RateLimit RateLimitConfig `yaml:"rate_limit"`
 }
 
 // OIDCConfig makes Rampart an OIDC *relying party / resource server* against
@@ -161,6 +167,13 @@ type DashboardAuthConfig struct {
 	// SessionDuration caps how long a session is valid without re-login,
 	// independent of the OIDC token's own expiry.
 	SessionDuration time.Duration `yaml:"session_duration"`
+	// PostLogoutRedirectURL is where the IdP sends the browser back after
+	// RP-initiated logout (must be registered as a valid post-logout
+	// redirect URI on the OIDC client for providers that enforce that,
+	// Keycloak included). If empty, or if the provider doesn't advertise
+	// an end_session_endpoint, logout only clears Rampart's own session
+	// cookie — the IdP session may remain active. See docs/OIDC.md.
+	PostLogoutRedirectURL string `yaml:"post_logout_redirect_url"`
 }
 
 // APIRBACConfig validates OIDC access tokens on proxied requests and
@@ -204,6 +217,13 @@ func Default() Config {
 		Dashboard: DashboardConfig{
 			Enabled: false,
 			Listen:  "127.0.0.1:9090",
+			RateLimit: RateLimitConfig{
+				Enabled:            true,
+				RequestsPerSecond:  5,
+				Burst:              10,
+				MaxConcurrentPerIP: 10,
+				IdleTimeout:        10 * time.Minute,
+			},
 		},
 		OIDC: OIDCConfig{
 			RolesClaim: "realm_access.roles",
@@ -287,6 +307,14 @@ func (c Config) Validate() error {
 		}
 		if c.Dashboard.Listen == c.Listen {
 			return fmt.Errorf("dashboard.listen must differ from listen (the dashboard must not share the public proxy port)")
+		}
+		if c.Dashboard.RateLimit.Enabled {
+			if c.Dashboard.RateLimit.RequestsPerSecond <= 0 {
+				return fmt.Errorf("dashboard.rate_limit.requests_per_second must be > 0 when enabled")
+			}
+			if c.Dashboard.RateLimit.Burst <= 0 {
+				return fmt.Errorf("dashboard.rate_limit.burst must be > 0 when enabled")
+			}
 		}
 	}
 	if c.OIDC.Enabled {

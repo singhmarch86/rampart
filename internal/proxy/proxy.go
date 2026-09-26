@@ -11,7 +11,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -90,7 +89,7 @@ func New(cfg config.Config, logger *events.Logger) (*Proxy, error) {
 		rbacGuard := oidcauth.NewRBACGuard(provider, cfg.OIDC.APIRBAC, cfg.OIDC.RolesClaim, logger)
 		handler = rbacGuard.Middleware(handler)
 	}
-	handler = withRateLimit(handler, limiter, logger)
+	handler = ratelimit.Middleware(limiter, "ratelimit", logger, handler)
 	handler = withIPFilter(handler, filter, logger)
 
 	return &Proxy{handler: handler, limiter: limiter, abuseGuard: abuseGuard}, nil
@@ -111,7 +110,7 @@ func (p *Proxy) Close() {
 
 func withIPFilter(next http.Handler, filter *ipfilter.Filter, logger *events.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := clientIP(r)
+		ip := ratelimit.ClientIP(r)
 		allowed, reason := filter.Allowed(ip)
 		if !allowed {
 			logger.Log(events.Event{
@@ -123,51 +122,4 @@ func withIPFilter(next http.Handler, filter *ipfilter.Filter, logger *events.Log
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-func withRateLimit(next http.Handler, limiter *ratelimit.Limiter, logger *events.Logger) http.Handler {
-	if limiter == nil {
-		return next
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := clientIP(r)
-
-		if !limiter.Allow(ip) {
-			logger.Log(events.Event{
-				Action: events.ActionBlock, Layer: "ratelimit", Reason: "requests-per-second exceeded",
-				ClientIP: ip.String(), Method: r.Method, Path: r.URL.Path,
-			})
-			w.Header().Set("Retry-After", "1")
-			http.Error(w, "too many requests", http.StatusTooManyRequests)
-			return
-		}
-
-		if !limiter.Begin(ip) {
-			logger.Log(events.Event{
-				Action: events.ActionBlock, Layer: "ratelimit", Reason: "max concurrent requests exceeded",
-				ClientIP: ip.String(), Method: r.Method, Path: r.URL.Path,
-			})
-			http.Error(w, "too many concurrent requests", http.StatusTooManyRequests)
-			return
-		}
-		defer limiter.End(ip)
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-// clientIP extracts the request's source IP, ignoring proxy headers (which
-// are attacker-controlled) unless Rampart itself is deployed behind a
-// trusted proxy — a case Phase 5 (cloud-native packaging) will address
-// explicitly via a trusted-proxy allowlist.
-func clientIP(r *http.Request) net.IP {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return net.IPv4zero
-	}
-	return ip
 }

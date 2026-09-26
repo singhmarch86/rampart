@@ -11,6 +11,42 @@ Entries are newest first.
 
 ---
 
+## 7. Dashboard server had no rate limiting of its own
+
+**Found:** During a deliberate hardening pass (not live-triggered by a test
+failure this time) — reviewing `cmd/rampart/main.go` side by side with
+`internal/proxy/proxy.go` while implementing RP-initiated logout made the
+asymmetry obvious: the main proxy chain wraps every request in
+`ratelimit.Middleware` (and IP filtering), but the dashboard's `http.Server`
+was just `Handler: dashboardHandler` — nothing in front of it at all.
+
+**The bug:** Anyone who could reach the dashboard port — including,
+notably, `/auth/login` and `/auth/callback` once OIDC dashboard auth is
+enabled — had no rate limiting whatsoever. Bound to `127.0.0.1` by default
+this is low-severity, but the documented escape hatch (putting an
+authenticating reverse proxy in front and exposing it more broadly) had no
+safety net under it if someone forgot this specific gap, and it's exactly
+the kind of asymmetry that's easy to introduce by adding a second
+`http.Server` without threading it through the same middleware discipline
+as the first.
+
+**The fix:** Extracted the proxy's rate-limiting middleware into a reusable
+`ratelimit.Middleware` (also removing duplicated `clientIP`/`withRateLimit`
+logic from `internal/proxy/proxy.go` in the process), added a
+`dashboard.rate_limit` config section with its own sane defaults (5 req/s,
+burst 10, 10 concurrent — enough for normal dashboard use plus the SSE
+event stream, tight enough to matter), and wired it as the outermost
+wrapper on the dashboard handler so it covers `/auth/*` and the analytics
+routes equally.
+
+**Verified:** Rebuilt and fired 15 rapid requests at the dashboard root —
+first 10 passed (matching the configured burst), the next 5 got 429, and
+the event log correctly attributed them to a new `dashboard-ratelimit`
+layer, distinguishable from the main proxy's `ratelimit` layer in the same
+event stream.
+
+---
+
 ## 6. OIDC dashboard login: roles read from the wrong token
 
 **Found:** During the OIDC/RBAC feature build, via live testing against a

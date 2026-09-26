@@ -68,12 +68,22 @@ logging:
 
 # Live attack-analytics dashboard (top attackers, block reasons, timeline,
 # live event feed). Runs on its OWN port, separate from `listen` above — it
-# has no authentication of its own yet, so keep it off a public interface
-# (the 127.0.0.1 default is deliberate; don't change it to 0.0.0.0 without
-# putting something in front of it, e.g. a reverse proxy with auth).
+# has no authentication of its own unless oidc.dashboard_auth is enabled
+# below, so keep it off a public interface (the 127.0.0.1 default is
+# deliberate; don't change it to 0.0.0.0 without either enabling
+# oidc.dashboard_auth or putting an authenticating reverse proxy in front).
 dashboard:
   enabled: false
   listen: "127.0.0.1:9090"
+  # Protects the dashboard's own port, including /auth/login and
+  # /auth/callback when OIDC dashboard auth is enabled — separate from the
+  # `rate_limit` above, which only covers the main proxy port.
+  rate_limit:
+    enabled: true
+    requests_per_second: 5
+    burst: 10
+    max_concurrent_per_ip: 10
+    idle_timeout: 10m
 
 # Makes Rampart an OIDC relying party / resource server against an
 # EXISTING identity provider (Keycloak, Auth0, Okta, ...) — it does not
@@ -101,6 +111,13 @@ oidc:
     # Required, at least 32 bytes, no insecure default: `openssl rand -hex 32`
     session_secret: ""
     session_duration: 8h
+    # Where the IdP sends the browser back after RP-Initiated Logout (only
+    # used if the provider advertises an end_session_endpoint — Keycloak
+    # does). Must be a registered post-logout redirect URI on the client;
+    # for Keycloak specifically that's the client's
+    # attributes["post.logout.redirect.uris"], not a top-level field —
+    # see docs/OIDC.md.
+    post_logout_redirect_url: "http://localhost:9090/"
 
   api_rbac:
     enabled: false
