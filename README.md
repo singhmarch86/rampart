@@ -27,6 +27,7 @@ Rampart itself during development and how it was fixed.
 - **Application layer (WAF)** — OWASP Top 10 detection via the Coraza engine + OWASP Core Rule Set
 - **API / mobile-backend layer** — credential-stuffing detection, token-abuse detection, request-schema validation
 - **Analytics** — attack timeline, top attackers, rule-hit dashboard. See [docs/DETECTION.md](docs/DETECTION.md) for how each layer decides what counts as an attack.
+- **Offline attack triage** — `rampart-analyze` turns a window of the block-event log into a Markdown report (top attackers, multi-vector IPs, traffic bursts), optionally narrated by an LLM. Separate binary, no dependency in the core proxy. See [docs/ANALYZE.md](docs/ANALYZE.md) for what it can and can't tell you.
 - **Cloud-native** — Docker image, Helm chart, Terraform module
 - **OIDC integration** — dashboard login and API role/permission enforcement against an existing identity provider (Keycloak, Auth0, Okta, ...). Rampart integrates with an IdP; it does not replace one. See [docs/OIDC.md](docs/OIDC.md).
 
