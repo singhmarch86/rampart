@@ -27,7 +27,7 @@ A few things I think are worth mentioning specifically:
   base64-encoded attacks were being caught by default CRS config, fixed it
   with a targeted anti-evasion rule, re-benchmarked at 65% with the
   false-positive rate unchanged. Full numbers: [link to benchmarks/RESULTS.md]
-- Every real bug found while building this — six so far — is documented
+- Every real bug found while building this — eight so far — is documented
   with root cause, fix, and how it was verified:
   [link to docs/FINDINGS.md]. I think a security tool should hold itself
   to the same "verify, don't just claim" standard it applies to traffic.
@@ -110,3 +110,39 @@ Distroless Docker image, runs as non-root, Helm chart if you're on k8s.
 Apache 2.0, no telemetry, nothing phones home.
 
 [repo link] — happy to answer setup questions here.
+
+---
+
+## LinkedIn
+
+**Body:**
+
+I built a self-hosted firewall from scratch — then spent as much time
+trying to break it as building it.
+
+Rampart sits in front of a web app and blocks attacks in real time — SQL
+injection, XSS, credential stuffing, malformed requests — as one binary
+with one config file, instead of stitching together nginx + ModSecurity +
+fail2ban + a log pipeline + a dashboard.
+
+The part I'm actually proud of isn't the feature list. It's this:
+
+→ Benchmarked independently with GoTestWAF — not a self-reported number.
+Found a real gap: 0% block rate on base64-encoded attack payloads. Fixed
+it with a targeted rule. Re-benchmarked: 63.12% → 65.25%, false-positive
+rate held exactly steady.
+
+→ Every real bug found during development — 8 so far — is logged publicly
+with root cause, the fix, and how it was verified. Including one where an
+attacker could dodge a brute-force lockout by interleaving one real login
+guess with a throwaway malformed request.
+
+→ Then I pointed govulncheck and gosec at Rampart's own source for the
+first time and found a log-injection bug in my own error handler.
+
+Most self-hosted security tools ask you to trust a README. I'd rather show
+the log of everything that was wrong and how it got fixed.
+
+Open source, Apache 2.0. [link]
+
+#buildinpublic #appsec #opensource
