@@ -1,0 +1,135 @@
+# Detection: how Rampart decides what counts as an attack
+
+This is a living reference for every detection mechanism Rampart runs, kept
+alongside the code the same way `docs/ROADMAP.md` and `docs/FINDINGS.md`
+are — add a new section here whenever a new detection layer or rule class
+ships, rather than letting this go stale. Each section covers what the
+layer looks at, how it decides to block, and a concrete example from an
+actual run (not a hypothetical), so the reasoning is checkable, not just
+asserted.
+
+Rampart runs four independent layers in front of every request. Each one
+answers a different question about "is this bad" — a request only needs to
+trip *one* to get blocked.
+
+---
+
+## 1. WAF — pattern matching with a cumulative anomaly score
+
+**Config:** `waf.*` — Coraza engine running the OWASP Core Rule Set (CRS),
+plus any custom rules in `waf.custom_rules_dir`.
+
+**What it looks at:** the request's URL, headers, and body, checked against
+thousands of CRS rules — each rule looks for one specific suspicious
+pattern (a SQL keyword in an odd position, a `<script>` tag, a path
+traversal sequence, a known exploit signature, etc.).
+
+**How it decides to block:** not "one match = block." Each rule that fires
+adds points to an **anomaly score** for that request; only once the total
+score crosses a threshold does Rampart block it. This exists specifically
+so one borderline signal doesn't block a legitimate request, but several
+suspicious signals stacking up does.
+
+**Example, from a live run against the `docker-compose.yml` demo stack
+(Rampart in front of OWASP Juice Shop):**
+
+| Payload sent | Result |
+|---|---|
+| `1' OR '1'='1` | `403`, anomaly score 20 |
+| `' UNION SELECT * FROM users--` | `403`, anomaly score 20 |
+| `<script>alert(1)</script>` | `403`, anomaly score 15 |
+| `<img src=x onerror=alert(1)>` | `403`, anomaly score 5 |
+
+Different payloads trip different combinations of rules, hence different
+scores — the dashboard's "Top block reasons" table shows each distinct
+score as its own line (`Inbound Anomaly Score Exceeded (Total Score: N)`),
+which is why you'll see several WAF rows for what looks like "the same"
+block reason.
+
+**Custom rules close specific gaps CRS leaves open by design.** CRS at the
+default paranoia level doesn't base64-decode every argument before running
+SQLi/XSS detection (decoding everything would false-positive on legitimate
+base64 — JWTs, image data URIs, uploads), so a base64-encoded attack
+payload sails through untouched otherwise.
+[`configs/waf-custom-rules/02-anti-evasion-base64.conf`](../configs/waf-custom-rules/02-anti-evasion-base64.conf)
+decodes each argument/body with `base64DecodeExt` and re-runs the same
+`@detectSQLi`/`@detectXSS` operators CRS itself uses — narrow by design, so
+it only fires when a value is both valid base64 *and* decodes to something
+matching a known attack signature. Verified via GoTestWAF: Base64Flat block
+rate 0% → 24%, false-positive rate unchanged. Full story in
+[docs/FINDINGS.md #2](FINDINGS.md#2-waf-0-block-rate-on-base64-encoded-attack-payloads).
+
+---
+
+## 2. API-abuse — behavior over time, not request content
+
+**Config:** `api_abuse.rules[]` — one rule per auth-gated endpoint you want
+watched.
+
+**What it looks at:** nothing about the *content* of any single request.
+It counts responses per client IP against a configured endpoint over a
+sliding window.
+
+**How it decides to block:** if an IP racks up `max_failures` responses
+matching `failure_status_codes` within `window`, that IP is blocked from
+that endpoint for `block_duration`. The default demo rule
+(`login-brute-force`) watches `POST /rest/user/login` for `401`s: 5
+failures in 1 minute → blocked for 5 minutes.
+
+**Example, from the same live run:** 5 login attempts with the wrong
+password each returned `401` (genuine auth failures, not blocked); the 6th
+and 7th attempts — same IP, same endpoint, within the window — returned
+`429` before Juice Shop's own login handler even ran.
+
+**A subtlety worth knowing, because it was a real bug once:** only a
+genuine success (2xx) resets an IP's failure streak. An earlier version
+reset the streak on *any* non-failure response, including a `400` from
+the schema-validation layer below — which let an attacker interleave one
+real guess with one throwaway malformed request (guaranteed 400, costs
+nothing) to dodge the lockout indefinitely. See
+[docs/FINDINGS.md #3](FINDINGS.md#3-api-abuse-guard-failure-streak-reset-let-attackers-dodge-lockout).
+
+---
+
+## 3. Schema validation — shape, not signature
+
+**Config:** `schema_validation.rules[]` — one JSON Schema per route.
+
+**What it looks at:** whether a request body matches the JSON Schema
+declared for that route — field names, types, and whether unexpected
+fields are present at all.
+
+**How it decides to block:** no "attack pattern" needs to be present. A
+login request that includes an unexpected `isAdmin` field, or a field of
+the wrong type, gets rejected purely because a legitimate client would
+never send that shape — this catches mass-assignment-style attacks that
+don't look like anything on a WAF signature list, because there isn't one
+to write: the problem is what's *present*, not what's malicious-looking.
+
+---
+
+## 4. Rate limiting — pure volume, no inspection at all
+
+**Config:** `rate_limit.*` (main proxy) and `dashboard.rate_limit.*`
+(dashboard's own port, added separately — see
+[docs/FINDINGS.md #7](FINDINGS.md#7-dashboard-server-had-no-rate-limiting-of-its-own)
+for why it needed its own config rather than inheriting the proxy's).
+
+**What it looks at:** request count per client IP per second, plus burst
+allowance and max concurrent in-flight requests.
+
+**How it decides to block:** too many requests too fast from one IP gets
+`429`d, regardless of what's in those requests. This is the layer that
+catches raw flood/DoS-shaped traffic that wouldn't trip WAF or API-abuse
+at all, because there's nothing content-wise to flag.
+
+---
+
+## Adding a new layer or rule class
+
+When a new detection mechanism ships, add a section here in the same
+shape: config keys, what it looks at, how it decides to block, and a real
+example (a live request/response pair or a benchmark number, not a
+description of intended behavior). If it closes a gap found the same way
+finding #2's base64 gap was, link the relevant `docs/FINDINGS.md` entry
+rather than restating it.
