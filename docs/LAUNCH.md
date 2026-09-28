@@ -532,3 +532,75 @@ why it's not exploitable here, what a real fix looks like. Not fixed yet
 [link to docs/FINDINGS.md#9]
 
 #buildinpublic #appsec #opensource
+
+---
+
+## LinkedIn — what it actually took to make the demo public
+
+**Body:**
+
+The build was the easy part. Making it *publicly reachable* surfaced a
+different kind of bug.
+
+First VM: the smallest free-tier instance (1GB RAM). `docker build`
+just... stopped. No crash, no error — the kernel log showed
+`virtio_balloon` messages, the signal a VM gives off when it's memory
+starved, and zero build progress for several minutes straight. Not a
+Rampart bug, just genuinely not enough RAM to compile Rampart and build
+the Juice Shop image side by side.
+
+Bumped to a 2GB instance. Same config otherwise. Build finished in a few
+minutes.
+
+Then the dashboard timed out on the first request after the containers
+reported "started." Before assuming another bug, I tunneled in over SSH
+(raw port 22 was blocked, so through GCP's IAP instead) and checked
+directly: both containers running, both ports listening on 0.0.0.0. The
+first curl had just landed while Juice Shop was still finishing its own
+boot — a retry a few seconds later returned 200 immediately.
+
+Neither of these makes it into the "8 bugs found in Rampart" findings
+log, because neither one was a Rampart bug — they were infrastructure
+reality checks, and I think that distinction matters. A public demo isn't
+proof of correctness by itself; you still have to verify what's actually
+running, not just trust that "containers say started" means "working."
+
+Live now: http://34.29.169.231:8080 (attack it), dashboard at
+http://34.29.169.231:9090 (watch it happen).
+
+[repo link]
+
+#buildinpublic #appsec #devops #gcp
+
+---
+
+## LinkedIn — why self-hosted, for a security tool specifically
+
+**Body:**
+
+"Why would anyone run their own WAF instead of just using Cloudflare?"
+Fair question — for most people, they shouldn't. Cloudflare/AWS
+WAF/Imperva are better resourced, get threat-intel feeds Rampart never
+will, and require zero infrastructure to run.
+
+The case for self-hosted isn't "better," it's "different tradeoffs," and
+for a *security* tool specifically I think one of those tradeoffs matters
+more than usual: you can read every line deciding what blocks your
+traffic and what doesn't.
+
+A cloud WAF's rule engine is opaque by necessity — it's their product,
+their IP, and it changes underneath you without a changelog you get to
+read. That's fine for a lot of use cases. But "trust us, we're blocking
+the right things" is a harder sell for the exact category of tool whose
+entire job is a trust decision on every request.
+
+Rampart's answer: Coraza + OWASP CRS, the same open rule set ModSecurity
+uses — auditable, not a black box — wrapped in one binary you run
+yourself, with every bug found during its own development logged
+publicly (root cause, fix, verification) rather than patched silently.
+Nothing here is trying to out-scale Cloudflare. It's trying to be the
+version you can actually read.
+
+[repo link]
+
+#buildinpublic #appsec #opensource #softwarearchitecture
