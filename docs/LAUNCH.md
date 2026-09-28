@@ -194,3 +194,285 @@ Full numbers, reproduction steps, and the raw methodology:
 Open source, Apache 2.0. [repo link]
 
 #buildinpublic #appsec #opensource #waf
+
+---
+
+## LinkedIn series — one real bug per post
+
+A content-calendar set, one post per entry in `docs/FINDINGS.md`. Each is
+a real bug found in Rampart's own code, not a target app — root cause,
+fix, and how it was verified, pulled directly from the findings log. Post
+these spaced out (a few days apart), not all at once — they read better
+as an ongoing series than a dump.
+
+### Post: the credential-stuffing bypass (finding #3)
+
+I built a feature specifically to stop credential stuffing — then found a
+way around my own defense while testing it.
+
+The rule: 5 failed logins from one IP in a minute → blocked for 5 minutes.
+Straightforward.
+
+The bug: the failure counter reset on *any* non-success response, not just
+a real failed login. So an attacker could interleave one real password
+guess with one throwaway malformed request (guaranteed to fail
+differently, costs nothing) — and the counter would reset before ever
+hitting 5.
+
+That's not a theoretical gap. It's a complete bypass of the one feature
+whose entire job is stopping this exact attack.
+
+The fix: only a genuine success resets the streak now. Everything else —
+a 400, a 403, a 404 — gets left alone. Added a regression test for the
+exact interleaving pattern so it can't come back silently.
+
+Found by testing the feature adversarially, not by code review — the kind
+of bug that only shows up when you try to break your own tool instead of
+just checking it does the happy path.
+
+Full writeup: [link to docs/FINDINGS.md#3]
+
+#buildinpublic #appsec #opensource
+
+---
+
+### Post: the bug a screenshot caught (finding #4)
+
+Sometimes the best bug-finding tool is just looking at the thing you
+built.
+
+Built the analytics dashboard, wired it up, took a screenshot to check it
+looked right. Instead of the dashboard: a bare directory listing with one
+link on it.
+
+The cause: Go's `http.FileServer` only auto-serves a file literally named
+`index.html`. My embedded dashboard file was named `dashboard.html`. One
+character of mismatch, and instead of an error, you get a silently
+"working" file browser instead of your actual app.
+
+Fixed by writing a direct handler instead of leaning on FileServer's
+naming convention. Simpler and more explicit anyway.
+
+This is exactly why "verified live in a browser" is a real line in this
+project's findings log, not decoration — a passing `go build` and a
+clean `go vet` would never have caught this. Only looking at the actual
+rendered page would.
+
+[link to docs/FINDINGS.md#4]
+
+#buildinpublic #appsec
+
+---
+
+### Post: the container that worked right up until it didn't (finding #5)
+
+`docker build` — clean. `docker run` — starts fine. Enable the one
+feature the whole dashboard depends on (event logging) — crashes
+immediately with "permission denied."
+
+Root cause: the Dockerfile's `COPY` sets root ownership on every file it
+copies, *regardless* of the base image's configured non-root user. My
+distroless image runs as UID 65532, but `/app` — including the default
+event-log path — was root-owned with no write access for that user.
+
+The nasty part: this would pass every quick sanity check. Build works.
+Run works. Only fails once someone turns on the one feature that writes
+to disk — which is also the feature the entire analytics story depends
+on.
+
+Fix: a dedicated `/data` volume, `chown`'d to the runtime UID in the
+build stage, kept separate from the read-only `/app`.
+
+Verified with `docker cp` pulling the log file out of a running
+container — distroless has no shell, so that's the only way to actually
+confirm a write succeeded rather than just "process didn't crash."
+
+[link to docs/FINDINGS.md#5]
+
+#buildinpublic #docker #appsec
+
+---
+
+### Post: the OIDC bug that would have broken RBAC for every user, always
+
+Tested role-based access control against a real Keycloak instance (not a
+mock) — and a user with the correct role kept getting denied.
+
+The bug: I was reading roles off the **ID token**. Keycloak's default
+config puts `realm_access.roles` on the **access token** instead — which
+is actually correct, standard OIDC hygiene (ID token = who you are,
+access token = what you can do). But it meant role checks were reading a
+token that structurally could never have the claim.
+
+This wasn't an edge case. It would have failed for every user, on any
+stock Keycloak setup, indefinitely — the kind of bug that's invisible in
+a unit test with mocked tokens and only shows up against the real thing.
+
+Fixed by verifying the access token specifically for role extraction,
+while still using the ID token for identity. Confirmed by decoding a real
+Keycloak-issued token pair side by side — only one of them had the claim.
+
+Two regression tests now cover this exact distinction so it can't
+silently regress.
+
+[link to docs/FINDINGS.md#6]
+
+#buildinpublic #oidc #appsec
+
+---
+
+### Post: the security tool whose own dashboard had zero rate limiting
+
+Found this one during a deliberate hardening pass, not a bug report:
+comparing the main proxy chain against the dashboard's own server side by
+side.
+
+The main proxy: rate-limited, IP-filtered, every layer wired through.
+The dashboard's `http.Server`: nothing in front of it at all. Including
+`/auth/login` and `/auth/callback` once OIDC login is enabled.
+
+Low severity in the default config (dashboard's bound to loopback only),
+but it meant the documented escape hatch — putting an authenticating
+proxy in front to expose it more broadly — had no safety net under it if
+anyone forgot this specific gap.
+
+Fixed by extracting the proxy's rate-limiter into something reusable and
+wiring it onto the dashboard too, with its own tighter defaults (5 req/s
+vs the main proxy's 10 — enough for normal use plus the live event
+stream, tight enough to matter).
+
+Verified by firing 15 rapid requests at the dashboard: 10 passed matching
+the configured burst, the next 5 got 429'd, and it showed up as a
+distinct `dashboard-ratelimit` layer in the event log.
+
+[link to docs/FINDINGS.md#7]
+
+#buildinpublic #appsec
+
+---
+
+### Post: I finally pointed a scanner at my own code
+
+Seven bugs above — all found by testing Rampart's *behavior*: benchmarking
+the WAF, driving real login flows, screenshotting the dashboard. None of
+that touches Rampart's own source code for vulnerabilities.
+
+So I ran `govulncheck` and `gosec` against it for the first time.
+
+`govulncheck`: 7 CVEs, all in the Go standard library itself, none of
+them code bugs — just a stale toolchain. Fixed with one `go get`.
+
+`gosec`: 7 findings, 2 real.
+→ The event log (records attack traffic — IPs, request paths) was
+world-readable. Tightened to owner-only.
+→ The proxy's error handler logged the raw request path with `%s`.
+Since Go already URL-decodes that path, a crafted request like
+`/foo%0d%0aFAKE-LOG-LINE` would land as a literal newline in the log —
+letting an attacker forge a second, fake log line in my own output.
+Switched to `%q`, which escapes it instead. Verified with a standalone
+repro that it actually does.
+
+The other 5 gosec findings were false positives — flagged and suppressed
+with an inline comment explaining exactly why, not silenced with a
+blanket rule disable.
+
+Now wired into CI so this runs on every push, not just once.
+
+[link to docs/FINDINGS.md#8]
+
+#buildinpublic #appsec #golang
+
+---
+
+## LinkedIn — architecture thesis (not a bug post)
+
+**Body:**
+
+The pitch for Rampart in one sentence: don't reinvent proven security
+engines, build the integration layer that's actually missing.
+
+The WAF isn't a novel detection algorithm — it's Coraza running the OWASP
+Core Rule Set, the same rules ModSecurity uses (verified: benchmarked
+both, see the comparison post). The identity layer isn't a new auth
+system — it's an OIDC relying party against whatever IdP you already run
+(Keycloak, Auth0, Okta). Building either of those from scratch would be
+a categorically riskier undertaking: a bug in a WAF means a missed
+attack; a bug in a homegrown identity provider means account takeover
+across every app that trusts it.
+
+What's actually new is the integration: one binary, one config file, that
+gets you WAF + rate limiting + credential-stuffing detection + schema
+validation + OIDC RBAC + a live dashboard, instead of the realistic
+alternative — nginx + ModSecurity + fail2ban + a separate OIDC gateway
+plugin (Kong's is Enterprise-only) + a bolted-on Grafana pipeline, each
+with its own config language and no shared view of an attack that spans
+layers.
+
+"Don't roll your own crypto/auth" is close to universal security advice.
+I'd add: don't roll your own WAF signatures either, when a proven engine
+and a well-maintained ruleset already exist. Spend the engineering effort
+on the seams between tools instead — that's where the actual toil is.
+
+[repo link]
+
+#buildinpublic #appsec #softwarearchitecture
+
+---
+
+## LinkedIn — rampart-analyze
+
+**Body:**
+
+Added an offline companion tool to Rampart this week, and the interesting
+part is what I *didn't* build.
+
+The original idea: analyze the block-event log, have an LLM suggest new
+WAF rules for patterns it's seeing. Reasonable-sounding feature.
+
+Then I actually checked what data the log contains. Every layer in
+Rampart only logs **block** decisions — no request payload, no record of
+allowed traffic. Which means: it can't reveal a coverage gap (a missed
+attack, by definition, is never logged), and there's no payload captured
+to draft a new rule from.
+
+So I scaled the feature down to match what the data actually supports:
+`rampart-analyze` reads the block-event log and produces a plain
+triage report — top attackers, IPs that triggered more than one
+detection layer, traffic bursts — optionally narrated in plain English
+by an LLM whose system prompt explicitly forbids it from claiming to
+find gaps or draft rules, because the data can't back that claim.
+
+Separate binary from the core proxy, on purpose — running the firewall
+itself never needs an API key or outbound network call.
+
+I'd rather ship the smaller, honest version of a feature than the bigger
+one that quietly overclaims.
+
+[link to docs/ANALYZE.md]
+
+#buildinpublic #appsec #llm
+
+---
+
+## LinkedIn — the live demo
+
+**Body:**
+
+Wanted to see Rampart actually working, not just passing tests, so I
+stood up the full demo stack — Rampart in front of OWASP Juice Shop — and
+threw real attack traffic at it: SQL injection, XSS, a brute-force login
+attempt.
+
+Every single one got blocked before it reached the app, and showed up on
+the live dashboard in real time: 5 WAF blocks (anomaly scores of 5, 15,
+and 20 depending on payload severity), 4 API-abuse blocks once the login
+attempts crossed the 5-failure threshold — dashboard populated with the
+attacker IP, the block reasons, a live event feed, no manual work per
+attack.
+
+`docker compose up` gets you the same demo locally in one command if you
+want to try breaking it yourself.
+
+[repo link]
+
+#buildinpublic #appsec #demo

@@ -54,3 +54,4 @@ inline samples: [docs/manual.html](docs/manual.html).
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community guidelines |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [docs/LAUNCH.md](docs/LAUNCH.md) | Draft launch posts (Show HN, Reddit, LinkedIn) — internal, not for external linking |
+| [docs/VIDEO_SCRIPTS.md](docs/VIDEO_SCRIPTS.md) | Outlines for demo videos — internal, not for external linking |
