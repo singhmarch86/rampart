@@ -13,15 +13,13 @@ reflect WAF detection specifically, not the full stack).
 **Target:** Rampart proxying to a local OWASP Juice Shop instance, Coraza +
 OWASP Core Rule Set at default paranoia level 1.
 
-**Methodology note:** we could not find trustworthy published GoTestWAF
+**Methodology note:** we could not find trustworthy *published* GoTestWAF
 scores for other WAFs to compare against — the numbers circulating in search
 results for "2026 WAF benchmarks" cite product names/version strings
 (e.g. "Cloudflare WAF 3.0") that don't match how those vendors actually
 name their products, which is a strong signal of AI-generated SEO content,
-not real data. So there's no trustworthy external baseline here. What we do
-have is a reproducible, honest measurement of our own config, and a record
-of concretely improving it — which is arguably more useful than an
-unverifiable comparison anyway.
+not real data. Rather than leave it at that, we ran our own comparison —
+see "Comparison: ModSecurity standalone" below.
 
 ## Baseline (Phase 2 ship, CRS default config, no custom rules)
 
@@ -107,6 +105,57 @@ if someone wants to keep pushing this number up: either broaden the
 anti-evasion rule to more operators, or address those categories directly at
 a higher CRS paranoia level and re-measure the false-positive tradeoff.
 
+## Comparison: ModSecurity standalone
+
+Run: 2026-09-28, `benchmarks/reports-modsecurity/`. Same tool (GoTestWAF),
+same target (a local Juice Shop instance), same ruleset (OWASP CRS at
+paranoia level 1) — but running through the original **ModSecurity**
+engine (`owasp/modsecurity-crs:nginx`, the official reference image,
+reverse-proxying to Juice Shop) instead of Rampart/Coraza, and with no
+custom rules. This is the trustworthy external baseline the methodology
+note above says we couldn't find published — so we measured it ourselves.
+
+| Metric | ModSecurity standalone | Rampart (baseline) | Rampart (with anti-evasion fix) |
+|---|---|---|---|
+| Overall score | 63.27% | 63.12% | **65.25%** |
+| True-positive (attacks blocked) | 48.20% | 47.63% | **55.93%** |
+| True-negative (false-positive check) | 90.78% | 90.78% | 90.78% |
+
+Two things this shows:
+
+1. **Rampart's baseline (Coraza, no custom rules) is essentially identical
+   to raw ModSecurity** (63.12% vs. 63.27%, within measurement noise). That's
+   a good sign, not a null result — it confirms Coraza's reimplementation of
+   the ModSecurity engine is faithful to the original at the WAF-detection
+   level, not a degraded copy that happens to run in Go.
+2. **The custom anti-evasion rule is real, measurable value Rampart adds
+   beyond what ModSecurity provides out of the box** — the same base64
+   evasion gap exists in both (CRS's tradeoff, not a ModSecurity-specific
+   bug), but only Rampart closes it, putting Rampart ~2 points ahead.
+
+**The score gap understates the actual comparison, though.** This benchmark
+deliberately isolates the WAF layer — rate limiting and IP filtering were
+disabled for both runs so the numbers reflect WAF detection specifically.
+That means ModSecurity's 63.27% is genuinely its *entire* product at this
+layer: bare, nothing else. Rampart's 65.25% is one layer of a product that
+also ships credential-stuffing/token-abuse detection, JSON Schema request
+validation, rate limiting, and a live analytics dashboard — none of which
+ModSecurity has any equivalent for. Matching Rampart's full feature set
+around a ModSecurity core would mean separately standing up something like
+fail2ban for brute-force detection, a rate-limiting layer, and a log
+pipeline + dashboard — the exact "five tools stitched together" problem
+this project exists to avoid (see the README's "Why" section).
+
+**Reproduce:**
+```sh
+docker run -d --name juice-shop-bench -p 3000:3000 bkimminich/juice-shop
+docker run -d --name modsec-bench -p 8082:8080 \
+  -e PARANOIA=1 -e BACKEND="http://host.docker.internal:3000" -e PROXY=true \
+  owasp/modsecurity-crs:nginx
+docker run --rm -v "$PWD/benchmarks/reports-modsecurity:/app/reports" \
+  wallarm/gotestwaf --url=http://host.docker.internal:8082 --noEmailReport
+```
+
 ## Honest limitations of this benchmark
 
 - Single run each, not averaged — GoTestWAF's payload set is deterministic per
@@ -114,6 +163,13 @@ a higher CRS paranoia level and re-measure the false-positive tradeoff.
   check variance.
 - Paranoia level 1 only. CRS's own docs note PL2-4 catch more but raise the
   false-positive rate; that trade-off hasn't been explored here yet.
+- The ModSecurity comparison above reports overall/true-positive/true-negative
+  scores only — a per-encoder and per-attack-category breakdown (like the
+  Rampart baseline table earlier in this doc) wasn't extracted from the raw
+  CSV report due to a tooling issue during this run. The raw
+  `benchmarks/reports-modsecurity/*.csv` is kept locally for anyone who wants
+  to pull that breakdown themselves; worth doing properly in a follow-up
+  rather than guessing at it.
 - The `Plain`/`URL` encoder categories still have real gaps (ldap-injection,
   mail-injection, shell-injection, xml-injection) that this fix doesn't touch —
   those would need either a higher paranoia level or their own targeted

@@ -123,6 +123,12 @@ type DashboardConfig struct {
 	// the dashboard server was never wired through the same rate-limit
 	// middleware the main proxy chain gets. See finding #7 in docs/FINDINGS.md.
 	RateLimit RateLimitConfig `yaml:"rate_limit"`
+	// PublicNotice, if set, renders as a banner at the top of the dashboard
+	// page. Meant for a publicly-reachable demo deployment (see
+	// docs/PUBLIC_DEMO.md) to state plainly what's being shown and to whom
+	// — e.g. "public demo, protecting a deliberately vulnerable practice
+	// app, not a real service." Empty (the default) renders no banner.
+	PublicNotice string `yaml:"public_notice"`
 }
 
 // OIDCConfig makes Rampart an OIDC *relying party / resource server* against

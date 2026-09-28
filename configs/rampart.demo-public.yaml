@@ -1,0 +1,67 @@
+# Public-demo config: Rampart in front of the bundled OWASP Juice Shop
+# target, with the dashboard deliberately exposed to the public internet
+# (0.0.0.0, not 127.0.0.1) — see docs/PUBLIC_DEMO.md before using this.
+#
+# This is NOT the default (configs/rampart.compose.yaml keeps the
+# dashboard on loopback only, on purpose). Use this file specifically for
+# a standalone public demo deployment — Rampart in front of Juice Shop,
+# nothing else — never for a deployment protecting a real application,
+# since the dashboard here has no authentication and anyone who finds the
+# URL can see it.
+listen: ":8080"
+upstream: "http://juice-shop:3000"
+
+firewall:
+  allow: []
+  deny: []
+
+waf:
+  enabled: true
+  mode: "block"
+  custom_rules_dir: "/app/configs/waf-custom-rules"
+
+api_abuse:
+  enabled: true
+  rules:
+    - name: "login-brute-force"
+      methods: ["POST"]
+      path_prefix: "/rest/user/login"
+      failure_status_codes: [401]
+      max_failures: 5
+      window: 1m
+      block_duration: 5m
+
+schema_validation:
+  enabled: true
+  rules:
+    - methods: ["POST"]
+      path_prefix: "/rest/user/login"
+      schema_file: "/app/configs/schemas/login.json"
+
+rate_limit:
+  enabled: true
+  requests_per_second: 10
+  burst: 20
+  max_concurrent_per_ip: 50
+  idle_timeout: 10m
+
+dashboard:
+  enabled: true
+  listen: "0.0.0.0:9090"
+  # Tighter than the default (5 req/s) — this port is reachable by the
+  # whole internet now, not just whoever's on your local network, so
+  # random scanning/bot traffic needs to be cheap to absorb.
+  rate_limit:
+    enabled: true
+    requests_per_second: 3
+    burst: 6
+    max_concurrent_per_ip: 5
+    idle_timeout: 10m
+  public_notice: >-
+    Public demo — this Rampart instance protects a deliberately vulnerable
+    practice app (OWASP Juice Shop), not a real service. Attack traffic
+    here includes automated test traffic and anything real visitors send.
+    No real user data is behind this.
+
+logging:
+  events_path: "/data/rampart-events.jsonl"

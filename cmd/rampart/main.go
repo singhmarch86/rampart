@@ -59,7 +59,7 @@ func main() {
 	var dashboardLimiter *ratelimit.Limiter
 	if cfg.Dashboard.Enabled {
 		analyticsStore = analytics.New(logger)
-		dashboardHandler := analytics.NewServer(analyticsStore).Handler()
+		dashboardHandler := analytics.NewServer(analyticsStore, cfg.Dashboard.PublicNotice).Handler()
 
 		if cfg.OIDC.Enabled && cfg.OIDC.DashboardAuth.Enabled {
 			discoverCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

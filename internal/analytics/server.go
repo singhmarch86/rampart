@@ -1,14 +1,18 @@
 package analytics
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
+	"html"
 	"net/http"
 	"time"
 )
 
 //go:embed dashboard.html
 var dashboardHTML []byte
+
+const publicNoticePlaceholder = "<!--PUBLIC_NOTICE-->"
 
 // Server exposes the Store over HTTP: the dashboard page itself, a JSON
 // snapshot endpoint for it to poll, and a Server-Sent Events stream for a
@@ -19,10 +23,23 @@ var dashboardHTML []byte
 // whoever can reach the app.
 type Server struct {
 	store *Store
+	page  []byte // dashboardHTML with publicNotice (if any) already rendered in
 }
 
-func NewServer(store *Store) *Server {
-	return &Server{store: store}
+// NewServer builds a Server. publicNotice, if non-empty, renders as a
+// banner at the top of the dashboard — see DashboardConfig.PublicNotice in
+// internal/config and docs/PUBLIC_DEMO.md. It's rendered once here, not
+// per-request, since it comes from startup config and never changes for
+// the life of the process.
+func NewServer(store *Store, publicNotice string) *Server {
+	page := dashboardHTML
+	if publicNotice != "" {
+		banner := []byte(`<div class="public-notice">` + html.EscapeString(publicNotice) + `</div>`)
+		page = bytes.Replace(dashboardHTML, []byte(publicNoticePlaceholder), banner, 1)
+	} else {
+		page = bytes.Replace(dashboardHTML, []byte(publicNoticePlaceholder), nil, 1)
+	}
+	return &Server{store: store, page: page}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -34,7 +51,7 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write(dashboardHTML)
+		_, _ = w.Write(s.page)
 	})
 
 	mux.HandleFunc("/api/stats", func(w http.ResponseWriter, r *http.Request) {

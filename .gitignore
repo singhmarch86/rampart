@@ -7,5 +7,6 @@ rampart.db
 configs/rampart.yaml
 /benchmarks/reports/
 /benchmarks/reports-baseline/
+/benchmarks/reports-modsecurity/
 rampart-benchmark.log
 rampart-benchmark-events.jsonl

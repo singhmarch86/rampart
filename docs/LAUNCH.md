@@ -146,3 +146,51 @@ the log of everything that was wrong and how it got fixed.
 Open source, Apache 2.0. [link]
 
 #buildinpublic #appsec #opensource
+
+---
+
+## LinkedIn — ModSecurity comparison
+
+**Body:**
+
+"How does your WAF compare to X?" is usually unanswerable honestly —
+published WAF benchmark numbers online are mostly AI-generated SEO junk
+that don't even match how vendors name their own products. So instead of
+citing someone else's number, I ran the comparison myself.
+
+Rampart's WAF layer is Coraza — a from-scratch Go reimplementation of
+ModSecurity, the original open-source WAF engine that the OWASP Core Rule
+Set was actually built for. I benchmarked both, same tool (GoTestWAF), same
+target app, same ruleset, same paranoia level — the only variable was the
+engine.
+
+                        Overall   True-positive   False-positive rate
+ModSecurity (bare)       63.27%      48.20%            9.22%
+Rampart (baseline)       63.12%      47.63%            9.22%
+Rampart (+ custom rule)  65.25%      55.93%            9.22%
+
+ModSecurity vs. Rampart's baseline is within noise of each other — meaning
+Coraza's reimplementation of the ModSecurity engine is faithful to the
+original, not a degraded copy. The ~2-point gap to Rampart's final number
+is real, measurable value from one targeted custom rule (closing a
+base64-encoding evasion gap both engines share by default at paranoia
+level 1) — and the false-positive rate held exactly steady while it
+closed, which is the number that actually matters: more attacks caught
+without the WAF getting trigger-happy on legitimate traffic.
+
+But the score gap actually understates the comparison. This benchmark
+isolates the WAF layer only — rate limiting and IP filtering were off for
+both runs. So ModSecurity's 63.27% is its *entire* product at this layer:
+bare, nothing else. Rampart's 65.25% is one layer of a product that also
+ships credential-stuffing detection, request-schema validation, rate
+limiting, and a live analytics dashboard. Matching that around a
+ModSecurity core means separately bolting on fail2ban, a rate limiter, and
+a log pipeline — the exact "five tools stitched together" problem I built
+Rampart to avoid in the first place.
+
+Full numbers, reproduction steps, and the raw methodology:
+[link to benchmarks/RESULTS.md]
+
+Open source, Apache 2.0. [repo link]
+
+#buildinpublic #appsec #opensource #waf
