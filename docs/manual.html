@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rampart Manual</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-alt: #f6f8fa;
+    --border: #e1e4e8;
+    --text: #24292e;
+    --text-dim: #57606a;
+    --accent: #1a56db;
+    --accent-bg: #eaf1fd;
+    --code-bg: #f6f8fa;
+    --danger: #cf222e;
+    --ok: #1a7f37;
+    --warn: #9a6700;
+    --sidebar-w: 260px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+  }
+  code { background: var(--code-bg); padding: 2px 5px; border-radius: 4px; }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+  }
+  pre code { background: none; padding: 0; }
+
+  .layout { display: flex; min-height: 100vh; }
+  nav.sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  nav.sidebar .brand { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+  nav.sidebar .tag { color: var(--text-dim); font-size: 12px; margin-bottom: 20px; }
+  nav.sidebar h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--text-dim); margin: 20px 0 6px;
+  }
+  nav.sidebar ul { list-style: none; margin: 0; padding: 0; }
+  nav.sidebar li a {
+    display: block; padding: 4px 8px; border-radius: 6px; color: var(--text);
+    font-size: 13.5px;
+  }
+  nav.sidebar li a:hover { background: var(--accent-bg); text-decoration: none; }
+
+  main { flex: 1; max-width: 860px; padding: 40px 48px 120px; }
+  main h1 { font-size: 30px; margin: 0 0 8px; }
+  main h1 + p.lede { color: var(--text-dim); font-size: 16px; margin-top: 0; }
+  section { margin-top: 56px; padding-top: 8px; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: none; margin-top: 32px; }
+  section h2 { font-size: 22px; margin: 0 0 4px; }
+  section h2 .pilcrow { color: var(--border); font-weight: 400; margin-left: 6px; }
+  section h2 .pilcrow:hover { color: var(--accent); }
+  section h3 { font-size: 16px; margin: 24px 0 8px; }
+  section p { margin: 10px 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 14px 0; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--bg-alt); font-weight: 600; }
+  td code { white-space: nowrap; }
+
+  .badge {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+    border-radius: 999px; margin-left: 6px; vertical-align: middle;
+  }
+  .badge.done { background: #dafbe1; color: var(--ok); }
+  .badge.notdone { background: #fff1e5; color: var(--warn); }
+
+  .callout {
+    border-left: 3px solid var(--accent); background: var(--accent-bg);
+    padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; font-size: 14px;
+  }
+  .callout.warn { border-left-color: var(--warn); background: #fff8ec; }
+  .callout.danger { border-left-color: var(--danger); background: #fff0f0; }
+
+  footer { max-width: 860px; padding: 24px 48px 60px; color: var(--text-dim); font-size: 12.5px; }
+
+  @media (max-width: 860px) {
+    .layout { flex-direction: column; }
+    nav.sidebar { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 24px 20px 80px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <div class="brand">Rampart</div>
+    <div class="tag">Manual &amp; reference</div>
+
+    <h3>Start here</h3>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#quick-start">Quick start</a></li>
+      <li><a href="#detection">Detection layers</a></li>
+    </ul>
+
+    <h3>Reference</h3>
+    <ul>
+      <li><a href="#config-reference">Configuration reference</a></li>
+      <li><a href="#oidc">OIDC integration</a></li>
+      <li><a href="#deployment">Deployment</a></li>
+      <li><a href="#analyze">rampart-analyze</a></li>
+    </ul>
+
+    <h3>Evidence</h3>
+    <ul>
+      <li><a href="#benchmarks">Benchmarks</a></li>
+      <li><a href="#findings">Findings log</a></li>
+      <li><a href="#public-demo">Public demo tooling</a></li>
+    </ul>
+
+    <h3>Elsewhere in the repo</h3>
+    <ul>
+      <li><a href="../README.md">README.md</a></li>
+      <li><a href="ROADMAP.md">docs/ROADMAP.md</a></li>
+      <li><a href="FINDINGS.md">docs/FINDINGS.md</a></li>
+      <li><a href="DETECTION.md">docs/DETECTION.md</a></li>
+      <li><a href="ANALYZE.md">docs/ANALYZE.md</a></li>
+      <li><a href="OIDC.md">docs/OIDC.md</a></li>
+      <li><a href="DEPLOYMENT.md">docs/DEPLOYMENT.md</a></li>
+      <li><a href="../benchmarks/RESULTS.md">benchmarks/RESULTS.md</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <h1>Rampart</h1>
+    <p class="lede">A self-hosted, open-core firewall and attack-analytics platform. This page is a single-page reference — every section below links out to the fuller Markdown doc it's condensed from, so nothing here is the only copy of the truth.</p>
+
+    <section id="overview">
+      <h2>Overview <a class="pilcrow" href="#overview">#</a></h2>
+      <p>Rampart sits in front of your application as a reverse proxy and blocks network-, application-, and API-layer attacks in one place, then gives you a single dashboard to see what was blocked and why — instead of stitching together nginx + ModSecurity + fail2ban + a log pipeline + a dashboard.</p>
+      <table>
+        <tr><th>Layer</th><th>What it does</th><th>Status</th></tr>
+        <tr><td>Network</td><td>Reverse proxy, IP allow/deny, rate limiting</td><td><span class="badge done">done</span></td></tr>
+        <tr><td>Application (WAF)</td><td>Coraza + OWASP Core Rule Set, custom SecLang rules</td><td><span class="badge done">done</span></td></tr>
+        <tr><td>API / mobile-backend</td><td>Credential-stuffing detection, JSON Schema request validation</td><td><span class="badge done">done</span></td></tr>
+        <tr><td>Analytics</td><td>Live dashboard, offline triage tool (<code>rampart-analyze</code>)</td><td><span class="badge done">done</span></td></tr>
+        <tr><td>OIDC</td><td>Dashboard login + API RBAC against an existing IdP</td><td><span class="badge done">done</span></td></tr>
+        <tr><td>Cloud-native</td><td>Docker, Helm, Terraform (AWS ECS Fargate)</td><td><span class="badge done">done</span></td></tr>
+        <tr><td>Hosted Console</td><td>Paid tier — multi-node, longer retention, threat intel</td><td><span class="badge notdone">not started</span></td></tr>
+      </table>
+    </section>
+
+    <section id="quick-start">
+      <h2>Quick start <a class="pilcrow" href="#quick-start">#</a></h2>
+      <pre><code>go build -o bin/rampart ./cmd/rampart
+cp configs/rampart.example.yaml configs/rampart.yaml
+# edit configs/rampart.yaml: set upstream to the app you're protecting
+./bin/rampart -config configs/rampart.yaml</code></pre>
+      <p>Rampart listens on <code>listen</code> (default <code>:8080</code>) and proxies allowed traffic to <code>upstream</code>. Every block decision is written as a JSON line to <code>logging.events_path</code>.</p>
+      <h3>Or: zero-setup Docker demo</h3>
+      <pre><code>docker compose up
+# attack it at http://localhost:8080, dashboard at http://localhost:9090</code></pre>
+      <p>Runs Rampart in front of a bundled OWASP Juice Shop instance. See <a href="DEPLOYMENT.md">docs/DEPLOYMENT.md</a> for Helm and Terraform options.</p>
+    </section>
+
+    <section id="detection">
+      <h2>Detection layers <a class="pilcrow" href="#detection">#</a></h2>
+      <p>Four independent layers run in front of every request; a request only needs to trip one to get blocked. Full detail and real examples: <a href="DETECTION.md">docs/DETECTION.md</a>.</p>
+
+      <h3>WAF — cumulative anomaly score</h3>
+      <p>Coraza + OWASP CRS. Each matched rule adds points to a request's anomaly score; only crossing a threshold blocks it — so one borderline signal doesn't block legitimate traffic, but several stacking up does.</p>
+      <table>
+        <tr><th>Payload</th><th>Result</th></tr>
+        <tr><td><code>1' OR '1'='1</code></td><td>403, anomaly score 20</td></tr>
+        <tr><td><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></td><td>403, anomaly score 15</td></tr>
+      </table>
+
+      <h3>API-abuse — behavior over time</h3>
+      <p>Counts failure responses per IP against a configured endpoint over a sliding window; no request content is inspected.</p>
+      <pre><code>api_abuse:
+  enabled: true
+  rules:
+    - name: "login-brute-force"
+      methods: ["POST"]
+      path_prefix: "/rest/user/login"
+      failure_status_codes: [401]
+      max_failures: 5
+      window: 1m
+      block_duration: 5m</code></pre>
+
+      <h3>Schema validation — shape, not signature</h3>
+      <p>Rejects a request body that doesn't match a declared JSON Schema for the route — catches mass-assignment and structurally-wrong requests a signature-based WAF isn't designed to flag.</p>
+
+      <h3>Rate limiting — pure volume</h3>
+      <p>Per-IP requests/sec, burst allowance, and max concurrent in-flight requests. Catches flood-shaped traffic with nothing content-wise to flag.</p>
+    </section>
+
+    <section id="config-reference">
+      <h2>Configuration reference <a class="pilcrow" href="#config-reference">#</a></h2>
+      <p>YAML, parsed by <code>internal/config/config.go</code>. Top-level keys:</p>
+      <table>
+        <tr><th>Key</th><th>Type</th><th>Default</th><th>Notes</th></tr>
+        <tr><td><code>listen</code></td><td>string</td><td><code>:8080</code></td><td>Main proxy address</td></tr>
+        <tr><td><code>upstream</code></td><td>string</td><td><code>http://localhost:3000</code></td><td>App being protected</td></tr>
+        <tr><td><code>firewall.allow</code> / <code>.deny</code></td><td>[]string (CIDR)</td><td><code>[]</code></td><td>Empty allow = allow all, subject to deny</td></tr>
+        <tr><td><code>waf.enabled</code></td><td>bool</td><td><code>true</code></td><td>&nbsp;</td></tr>
+        <tr><td><code>waf.mode</code></td><td>"block" | "detect"</td><td><code>block</code></td><td>"detect" logs without blocking — use when tuning</td></tr>
+        <tr><td><code>waf.custom_rules_dir</code></td><td>string</td><td>&mdash;</td><td>SecLang <code>.conf</code> files, applied after CRS</td></tr>
+        <tr><td><code>rate_limit.requests_per_second</code></td><td>float</td><td><code>10</code></td><td>Per client IP</td></tr>
+        <tr><td><code>rate_limit.burst</code></td><td>int</td><td><code>20</code></td><td>&nbsp;</td></tr>
+        <tr><td><code>rate_limit.max_concurrent_per_ip</code></td><td>int</td><td><code>50</code></td><td>0 disables the check</td></tr>
+        <tr><td><code>api_abuse.rules[]</code></td><td>list</td><td>&mdash;</td><td>See sample above</td></tr>
+        <tr><td><code>schema_validation.rules[]</code></td><td>list</td><td>&mdash;</td><td><code>methods</code>, <code>path_prefix</code>, <code>schema_file</code></td></tr>
+        <tr><td><code>dashboard.enabled</code></td><td>bool</td><td><code>false</code></td><td>&nbsp;</td></tr>
+        <tr><td><code>dashboard.listen</code></td><td>string</td><td><code>127.0.0.1:9090</code></td><td>Loopback by default — deliberate, no auth without OIDC</td></tr>
+        <tr><td><code>dashboard.public_notice</code></td><td>string</td><td>&mdash;</td><td>Optional banner for a public demo deployment</td></tr>
+        <tr><td><code>oidc.enabled</code></td><td>bool</td><td><code>false</code></td><td>See <a href="#oidc">OIDC section</a></td></tr>
+        <tr><td><code>logging.events_path</code></td><td>string</td><td><code>rampart-events.jsonl</code></td><td>Empty disables event logging</td></tr>
+      </table>
+      <p>Full struct definitions, comments, and validation rules: <code>internal/config/config.go</code>.</p>
+    </section>
+
+    <section id="oidc">
+      <h2>OIDC integration <a class="pilcrow" href="#oidc">#</a></h2>
+      <p>Rampart integrates with an existing identity provider (Keycloak, Auth0, Okta, ...) rather than becoming one — no user store, no login UI, no token issuance. Two independent features:</p>
+      <ul>
+        <li><strong>Dashboard login</strong> (<code>oidc.dashboard_auth</code>) — Authorization Code + PKCE, required to view the dashboard.</li>
+        <li><strong>API RBAC</strong> (<code>oidc.api_rbac</code>) — validates access tokens on proxied requests, enforces per-route roles.</li>
+      </ul>
+      <pre><code>oidc:
+  enabled: true
+  issuer_url: "https://keycloak.example.com/realms/myrealm"
+  api_rbac:
+    enabled: true
+    rules:
+      - path_prefix: "/admin"
+        required_roles: ["admin"]
+      - path_prefix: "/api"
+        required_roles: []   # any valid token</code></pre>
+      <div class="callout">
+        Verified against a real Keycloak instance, not mocks — including finding that roles live on the <strong>access token</strong>, not the ID token, on stock Keycloak. Full walkthrough and the Keycloak-specific gotchas: <a href="OIDC.md">docs/OIDC.md</a>.
+      </div>
+    </section>
+
+    <section id="deployment">
+      <h2>Deployment <a class="pilcrow" href="#deployment">#</a></h2>
+      <h3>Docker</h3>
+      <pre><code>docker build -t rampart .
+docker run -d -p 8080:8080 -p 127.0.0.1:9090:9090 \
+  -v $(pwd)/configs/rampart.yaml:/app/configs/rampart.yaml:ro \
+  -v rampart-data:/data \
+  rampart</code></pre>
+      <p>Distroless, non-root (UID 65532). <code>/app</code> read-only, <code>/data</code> the only writable path.</p>
+      <h3>Kubernetes (Helm)</h3>
+      <pre><code>helm install my-rampart ./deploy/helm/rampart --set upstream=http://myapp:8080</code></pre>
+      <p>Standalone, sidecar, or ingress-exposed patterns — see <code>deploy/helm/rampart/README.md</code>. <code>helm lint</code>/<code>helm template</code> verified; not yet run against a live cluster.</p>
+      <h3>AWS (Terraform, ECS Fargate)</h3>
+      <pre><code>module "rampart" {
+  source = "./deploy/terraform/aws-ecs-fargate"
+}</code></pre>
+      <p>Written against the documented provider schema; not yet run through <code>terraform validate</code> in this environment.</p>
+      <div class="callout warn">
+        The dashboard has no authentication of its own. Every deployment path here defaults to keeping it off a public interface — widening that requires either OIDC dashboard auth or an authenticating proxy in front.
+      </div>
+    </section>
+
+    <section id="analyze">
+      <h2>rampart-analyze <a class="pilcrow" href="#analyze">#</a></h2>
+      <p>A separate binary — no dependency in the core proxy or its build — that reads a window of the block-event log and produces a Markdown triage report: top attackers, top block reasons, IPs that triggered more than one detection layer, and traffic bursts.</p>
+      <pre><code>go build -o bin/rampart-analyze ./cmd/rampart-analyze
+./bin/rampart-analyze -events rampart-events.jsonl -since 168h -out report.md</code></pre>
+      <div class="callout">
+        Scope, stated plainly: every event is a <em>block</em> decision only — no payload, no record of allowed traffic. This tool can triage what's already caught; it cannot find coverage gaps or draft new rules from data that isn't there. Full reasoning: <a href="ANALYZE.md">docs/ANALYZE.md</a>.
+      </div>
+      <p>Optional <code>-narrate</code> flag adds a plain-English summary via the Anthropic API (<code>ANTHROPIC_API_KEY</code>), skipped automatically if unset — the tables-only report always works without one.</p>
+    </section>
+
+    <section id="benchmarks">
+      <h2>Benchmarks <a class="pilcrow" href="#benchmarks">#</a></h2>
+      <p>Measured with <a href="https://github.com/wallarm/gotestwaf" target="_blank" rel="noopener">GoTestWAF</a>, WAF layer in isolation (rate limiting/IP filtering disabled for a clean measurement). Full methodology and reproduction steps: <a href="../benchmarks/RESULTS.md">benchmarks/RESULTS.md</a>.</p>
+      <table>
+        <tr><th></th><th>Overall</th><th>True-positive</th><th>False-positive rate</th></tr>
+        <tr><td>ModSecurity standalone (bare, PL1)</td><td>63.27%</td><td>48.20%</td><td>9.22%</td></tr>
+        <tr><td>Rampart baseline (Coraza, no custom rules)</td><td>63.12%</td><td>47.63%</td><td>9.22%</td></tr>
+        <tr><td>Rampart + base64 anti-evasion rule</td><td><strong>65.25%</strong></td><td><strong>55.93%</strong></td><td>9.22%</td></tr>
+      </table>
+      <p>Rampart's baseline matching ModSecurity within noise confirms Coraza's reimplementation is faithful to the original engine, not a degraded copy. The gap to Rampart's final number is real, measured value from one targeted custom rule closing a base64-encoding evasion gap both engines share by default — with the false-positive rate holding exactly steady while it closed.</p>
+      <p>This isolates the WAF layer only: ModSecurity's number is its <em>entire</em> product at this layer, while Rampart's is one layer of a product that also ships credential-stuffing detection, schema validation, rate limiting, and a live dashboard.</p>
+    </section>
+
+    <section id="findings">
+      <h2>Findings log <a class="pilcrow" href="#findings">#</a></h2>
+      <p>Every real bug or vulnerability found in Rampart itself during development — 8 so far — logged with root cause, fix, and how the fix was verified. Full log: <a href="FINDINGS.md">docs/FINDINGS.md</a>.</p>
+      <table>
+        <tr><th>#</th><th>What</th></tr>
+        <tr><td>8</td><td>Self-scan (<code>govulncheck</code> + <code>gosec</code>) found a log-injection bug and an over-permissive log file, in Rampart's own source</td></tr>
+        <tr><td>7</td><td>Dashboard server had no rate limiting of its own</td></tr>
+        <tr><td>6</td><td>OIDC dashboard login read roles from the wrong token (ID token vs. access token)</td></tr>
+        <tr><td>3</td><td>API-abuse guard: a malformed request could reset the failure streak, letting an attacker dodge lockout</td></tr>
+        <tr><td>2</td><td>WAF: 0% block rate on base64-encoded attack payloads — found via GoTestWAF, fixed with a custom rule</td></tr>
+      </table>
+    </section>
+
+    <section id="public-demo">
+      <h2>Public demo tooling <a class="pilcrow" href="#public-demo">#</a></h2>
+      <p>Built and tested, not currently deployed. A separate config (<code>configs/rampart.demo-public.yaml</code>) and standalone compose file (<code>docker-compose.public-demo.yml</code>) expose the dashboard publicly with a tightened rate limit and a configurable notice banner (<code>dashboard.public_notice</code>) — for a Juice-Shop-only demo, never for a deployment protecting a real application.</p>
+      <div class="callout warn">
+        Held off on actually deploying this publicly: it would be the first time this project has run on the open internet, with no monitoring in place yet. The code is ready when the decision is made to go live.
+      </div>
+    </section>
+  </main>
+</div>
+<footer>
+  Generated as part of Rampart's own documentation, from the same verified sources as the linked Markdown docs — nothing on this page is asserted that isn't backed by a file elsewhere in this repo.
+</footer>
+</body>
+</html>

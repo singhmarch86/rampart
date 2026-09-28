@@ -8,6 +8,8 @@ in front of your application as a reverse proxy and blocks network-, application
 and API-layer attacks in one place, then gives you a single dashboard to see
 what was blocked and why.
 
+**[Full documentation index →](DOCUMENTATION.md)**
+
 ## Why
 
 Most teams stitch together nginx + ModSecurity + fail2ban + a log pipeline +
