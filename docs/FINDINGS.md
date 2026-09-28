@@ -11,6 +11,51 @@ Entries are newest first.
 
 ---
 
+## 9. WAF: server-side template injection payloads pass through unblocked
+
+**Found:** Writing `scripts/test-attacks.sh` — a one-shot suite covering
+one payload per vulnerability class, meant to be runnable against either a
+local instance or the live public demo, complementing the continuous
+`scripts/demo-traffic.sh` generator. Run live against the public demo
+(`http://34.29.169.231:8080`), a bare SSTI probe (`{{7*7}}` on the search
+endpoint) came back `200` instead of the `403` every other category in the
+suite got. Re-checked directly with `curl` (not just the script) to rule
+out a script bug before trusting the result — repeatable, not a fluke.
+
+**The gap:** OWASP CRS at the paranoia level this demo runs has no rule
+that recognizes a bare `{{ expression }}` pattern as an attack signature —
+unlike SQLi/XSS/path traversal/command injection/NoSQL/LDAP injection,
+which CRS's core rule set does cover natively, and unlike the base64-SQLi
+case (finding #2), this isn't an encoding-evasion problem on top of
+existing coverage — there's no base rule to evade around in the first
+place. Not exploitable *on this specific demo* (Juice Shop's search
+endpoint doesn't feed the query into a template engine, so the payload is
+inert here), but the WAF layer itself doesn't recognize the pattern, which
+would matter against a real target that does use a server-side template
+engine (a real, common vulnerability class — Jinja2, Freemarker,
+Thymeleaf, Velocity, etc. have all had real-world SSTI CVEs leading to
+RCE).
+
+**Status: documented, not yet fixed.** Left as a known, verified gap
+rather than silently working around it in the test script (the check
+stays in `scripts/test-attacks.sh` with an inline comment, and is expected
+to legitimately fail until this is addressed) or overclaiming it's
+covered. A fix would look like finding #2's: a targeted custom SecLang
+rule matching template-expression syntax across the handful of common
+engines, verified against both true positives and legitimate-looking
+`{{`/`}}`-containing input (Angular/Vue template literals in a request
+body, for instance) before shipping.
+
+**Verified:** Confirmed independently outside the test script (`curl -G
+--data-urlencode 'q={{7*7}}' http://34.29.169.231:8080/rest/products/search`
+→ `200`, repeated on a fresh request after the demo had otherwise settled)
+and ruled out rate-limiting/lockout interference as the cause (a separate,
+unrelated timing issue hit the *same test run* — see the script's pacing
+comment — but the SSTI result was 200 both under load and after slowing
+requests down, so it isn't that).
+
+---
+
 ## 8. Rampart had never pointed a scanner at its own Go source
 
 **Found:** All seven findings above came from behavioral testing — a WAF
