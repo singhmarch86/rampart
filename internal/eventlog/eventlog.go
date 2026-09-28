@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/events"
 )
 
 // Read parses every line of path as a JSON-encoded events.Event and

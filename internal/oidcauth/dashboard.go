@@ -13,8 +13,8 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
-	"github.com/gauravdeepsingh/rampart/internal/config"
-	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/config"
+	"github.com/singhmarch86/rampart/internal/events"
 )
 
 const authStateCookieName = "rampart_auth_state"

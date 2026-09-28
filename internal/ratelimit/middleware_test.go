@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/events"
 )
 
 func okHandler() http.Handler {

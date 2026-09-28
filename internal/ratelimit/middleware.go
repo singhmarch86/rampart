@@ -4,7 +4,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/events"
 )
 
 // Middleware wraps next with rate limiting by client IP. layer names the

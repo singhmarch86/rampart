@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gauravdeepsingh/rampart/internal/config"
-	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/config"
+	"github.com/singhmarch86/rampart/internal/events"
 )
 
 func newTestWAF(t *testing.T, cfg config.WAFConfig) *WAF {

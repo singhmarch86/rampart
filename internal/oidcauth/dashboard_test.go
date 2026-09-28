@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gauravdeepsingh/rampart/internal/config"
-	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/config"
+	"github.com/singhmarch86/rampart/internal/events"
 )
 
 // mockOIDCProviderWithToken extends mockOIDCProvider with a real /token

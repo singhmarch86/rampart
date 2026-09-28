@@ -1,4 +1,4 @@
-module github.com/gauravdeepsingh/rampart
+module github.com/singhmarch86/rampart
 
 go 1.26.6
 

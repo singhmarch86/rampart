@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/events"
 )
 
 func mustParse(t *testing.T, s string) time.Time {

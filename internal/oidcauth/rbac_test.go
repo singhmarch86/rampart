@@ -9,8 +9,8 @@ import (
 
 	josejwt "github.com/go-jose/go-jose/v4/jwt"
 
-	"github.com/gauravdeepsingh/rampart/internal/config"
-	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/config"
+	"github.com/singhmarch86/rampart/internal/events"
 )
 
 func newTestGuard(t *testing.T, mock *mockOIDCProvider, rules ...config.APIRBACRule) *RBACGuard {

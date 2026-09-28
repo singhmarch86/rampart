@@ -1,6 +1,6 @@
 # Rampart
 
-[![CI](https://github.com/gauravdeepsingh/rampart/actions/workflows/ci.yml/badge.svg)](https://github.com/gauravdeepsingh/rampart/actions/workflows/ci.yml)
+[![CI](https://github.com/singhmarch86/rampart/actions/workflows/ci.yml/badge.svg)](https://github.com/singhmarch86/rampart/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 A self-hosted, open-core firewall and attack-analytics platform. Rampart sits

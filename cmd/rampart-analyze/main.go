@@ -14,8 +14,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/gauravdeepsingh/rampart/internal/analyze"
-	"github.com/gauravdeepsingh/rampart/internal/eventlog"
+	"github.com/singhmarch86/rampart/internal/analyze"
+	"github.com/singhmarch86/rampart/internal/eventlog"
 )
 
 func main() {

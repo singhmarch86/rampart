@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/events"
 )
 
 func TestServerRendersPublicNoticeWhenSet(t *testing.T) {

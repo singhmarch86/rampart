@@ -12,12 +12,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gauravdeepsingh/rampart/internal/analytics"
-	"github.com/gauravdeepsingh/rampart/internal/config"
-	"github.com/gauravdeepsingh/rampart/internal/events"
-	"github.com/gauravdeepsingh/rampart/internal/oidcauth"
-	"github.com/gauravdeepsingh/rampart/internal/proxy"
-	"github.com/gauravdeepsingh/rampart/internal/ratelimit"
+	"github.com/singhmarch86/rampart/internal/analytics"
+	"github.com/singhmarch86/rampart/internal/config"
+	"github.com/singhmarch86/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/oidcauth"
+	"github.com/singhmarch86/rampart/internal/proxy"
+	"github.com/singhmarch86/rampart/internal/ratelimit"
 )
 
 func main() {

@@ -16,14 +16,14 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/gauravdeepsingh/rampart/internal/apiabuse"
-	"github.com/gauravdeepsingh/rampart/internal/config"
-	"github.com/gauravdeepsingh/rampart/internal/events"
-	"github.com/gauravdeepsingh/rampart/internal/ipfilter"
-	"github.com/gauravdeepsingh/rampart/internal/oidcauth"
-	"github.com/gauravdeepsingh/rampart/internal/ratelimit"
-	"github.com/gauravdeepsingh/rampart/internal/schema"
-	"github.com/gauravdeepsingh/rampart/internal/waf"
+	"github.com/singhmarch86/rampart/internal/apiabuse"
+	"github.com/singhmarch86/rampart/internal/config"
+	"github.com/singhmarch86/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/ipfilter"
+	"github.com/singhmarch86/rampart/internal/oidcauth"
+	"github.com/singhmarch86/rampart/internal/ratelimit"
+	"github.com/singhmarch86/rampart/internal/schema"
+	"github.com/singhmarch86/rampart/internal/waf"
 )
 
 type Proxy struct {

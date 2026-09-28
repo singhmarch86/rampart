@@ -4,9 +4,9 @@ description: Self-hosted firewall/WAF/analytics reverse proxy
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
-home: https://github.com/gauravdeepsingh/rampart
+home: https://github.com/singhmarch86/rampart
 sources:
-  - https://github.com/gauravdeepsingh/rampart
+  - https://github.com/singhmarch86/rampart
 keywords:
   - security
   - waf

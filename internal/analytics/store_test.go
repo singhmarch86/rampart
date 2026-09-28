@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gauravdeepsingh/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/events"
 )
 
 func newTestStore(t *testing.T) (*events.Logger, *Store) {
