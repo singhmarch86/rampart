@@ -476,3 +476,59 @@ want to try breaking it yourself.
 [repo link]
 
 #buildinpublic #appsec #demo
+
+---
+
+## LinkedIn — try it yourself, live
+
+**Body:**
+
+Rampart is now running publicly, in front of a deliberately vulnerable
+practice app (OWASP Juice Shop) — not a screenshot, not a staged video,
+an actual instance you can attack right now.
+
+http://34.29.169.231:8080 — the protected app itself. Try a SQL injection
+in the search box, or brute-force the login. It's built to be broken.
+
+http://34.29.169.231:9090 — the live dashboard. Watch your own attack
+attempts show up in real time: blocked reason, source IP, which layer
+caught it (WAF, brute-force lockout, schema validation).
+
+Nothing about this is staged — it's the same binary and config anyone
+running `docker compose up` from the repo gets locally.
+
+Repo (Apache 2.0): https://github.com/singhmarch86/rampart
+
+#buildinpublic #appsec #opensource #demo
+
+---
+
+### Post: the gap the test suite itself found (finding #9)
+
+Wrote a one-shot test suite this week — one payload per vulnerability
+class, run against the live public demo, pass/fail per category. Point
+was verification, not marketing. It found something.
+
+Nine categories blocked clean: SQLi, XSS, path traversal, command
+injection, NoSQL injection, LDAP injection, base64-encoded SQLi,
+mass-assignment, brute-force lockout.
+
+One didn't: a bare `{{7*7}}` — server-side template injection — sailed
+straight through, 200 instead of a block.
+
+Checked it wasn't a fluke (repeatable, confirmed with a standalone curl
+outside the script) and checked why: unlike the base64-SQLi gap I found
+and closed earlier (an encoding trick around a rule that *does* exist),
+this one has no base rule to evade — OWASP CRS at this paranoia level
+just has no signature for template-expression syntax at all.
+
+Not exploitable on *this* demo specifically (Juice Shop's search endpoint
+doesn't feed into a template engine), but it's a real, documented gap —
+SSTI has led to real RCEs in the wild (Jinja2, Freemarker, Thymeleaf,
+Velocity). Logged it the same way as the other 8 findings: root cause,
+why it's not exploitable here, what a real fix looks like. Not fixed yet
+— that's next.
+
+[link to docs/FINDINGS.md#9]
+
+#buildinpublic #appsec #opensource
