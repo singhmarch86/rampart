@@ -5,6 +5,43 @@ like you, and post yourself. Recommended order: wait until there's a
 tagged release on a public GitHub repo before posting any of these (a dead
 link in a Show HN post is a bad first impression).
 
+## Suggested LinkedIn posting order (day-by-day)
+
+One post a day, not a batch dump — LinkedIn reach rewards consistency
+over volume, and posting several at once just cannibalizes each other.
+Covers all 15 LinkedIn drafts here plus the 6 in
+[scryer/docs/LAUNCH.md](https://github.com/singhmarch86/scryer/blob/main/docs/LAUNCH.md),
+interleaved. Intros go first so later posts have context; the bug-finding
+series lands mid-sequence once people know what the projects are;
+benchmarks/deployment/thesis close it out.
+
+**Week 1 — introduce both projects**
+1. Rampart — "LinkedIn" (main intro, "I built a self-hosted firewall from scratch...")
+2. Scryer — "LinkedIn — why Scryer exists"
+3. Rampart — "LinkedIn — architecture thesis"
+4. Scryer — "LinkedIn — architecture thesis"
+5. Rampart — "LinkedIn — the live demo"
+6. Rampart — "LinkedIn — try it yourself, live"
+7. Scryer — "LinkedIn — try it yourself"
+
+**Week 2 — findings, one bug per post**
+8. Rampart — "Post: the credential-stuffing bypass (finding #3)"
+9. Scryer — "LinkedIn — the Spring rule pack that shrank by 86% once I checked"
+10. Rampart — "Post: the bug a screenshot caught (finding #4)"
+11. Scryer — "LinkedIn — SARIF and skipping the UI nobody needed built"
+12. Rampart — "Post: the container that worked right up until it didn't (finding #5)"
+13. Rampart — "Post: the OIDC bug that would have broken RBAC for every user, always"
+14. Scryer — "LinkedIn — pointing a scanner at the scanner"
+
+**Week 3 — benchmarks, deployment, close**
+15. Rampart — "Post: the security tool whose own dashboard had zero rate limiting"
+16. Rampart — "Post: I finally pointed a scanner at my own code"
+17. Rampart — "LinkedIn — ModSecurity comparison" (strongest credibility post — good candidate to boost)
+18. Rampart — "Post: the gap the test suite itself found (finding #9)"
+19. Rampart — "LinkedIn — what it actually took to make the demo public"
+20. Rampart — "LinkedIn — rampart-analyze"
+21. Rampart — "LinkedIn — why self-hosted, for a security tool specifically" (closing thesis)
+
 ---
 
 ## Show HN (news.ycombinator.com)
