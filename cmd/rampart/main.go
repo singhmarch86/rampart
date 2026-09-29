@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -18,11 +19,18 @@ import (
 	"github.com/singhmarch86/rampart/internal/oidcauth"
 	"github.com/singhmarch86/rampart/internal/proxy"
 	"github.com/singhmarch86/rampart/internal/ratelimit"
+	"github.com/singhmarch86/rampart/internal/version"
 )
 
 func main() {
 	configPath := flag.String("config", "configs/rampart.yaml", "path to config file")
+	versionFlag := flag.Bool("version", false, "print version and origin repo, then exit")
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Println(version.String())
+		return
+	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
