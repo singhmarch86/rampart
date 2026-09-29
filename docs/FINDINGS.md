@@ -11,6 +11,64 @@ Entries are newest first.
 
 ---
 
+## 10. API-abuse and schema validation: path-case bypass skips both layers
+
+**Found:** Deliberate adversarial pass after closing finding #9 - looked
+for the next class of bug rather than waiting for the test suite to trip
+over one. `internal/apiabuse/apiabuse.go` and `internal/schema/schema.go`
+both scope their rules by `path_prefix`, matched with
+`strings.HasPrefix(req.URL.Path, r.PathPrefix)`. Go's `strings.HasPrefix`
+is case-sensitive. Juice Shop (and most Node/Express targets) is not:
+Express's default `case sensitive routing` setting is `false`, so
+`/REST/User/Login` reaches the exact same handler as `/rest/user/login`.
+That mismatch means a request whose path case doesn't literally match the
+configured `path_prefix` skips the rule entirely, while the protected app
+processes it normally.
+
+**The bug, verified on an isolated local instance (fresh Juice Shop +
+freshly built image, not the shared live demo - its per-IP counters were
+already contaminated by a full day of testing and gave noisy, hard-to-read
+results):**
+- Mass-assignment payload (`isAdmin: true`) to `/rest/user/login` →
+  `400`, correctly blocked by schema validation. The identical payload to
+  `/REST/User/Login` → `401` - schema validation never ran, and Juice
+  Shop itself processed the request and returned its own real auth
+  failure. Confirmed `403` still fires for WAF-layer attacks (SQLi) via
+  the same uppercase path, isolating the bug to the two path-scoped
+  layers specifically, not a general case bug.
+- Brute-force lockout: 6 straight failed logins to `/REST/User/Login`
+  (fresh IP-state) → `401` every time, never the `429` that a 6th failure
+  triggers reliably against `/rest/user/login` (verified back-to-back on
+  the same fresh instance, same IP, only the path case differed).
+
+**Impact:** a trivial, one-character path-case change fully bypasses both
+credential-stuffing lockout and mass-assignment/request-shape validation
+- two of Rampart's four detection layers - while looking, from the
+attacker's side, identical to a normal request against the real app. The
+WAF layer is unaffected since Coraza's rules aren't scoped by
+`path_prefix` at all; they apply to `ARGS`/`REQUEST_BODY` regardless of
+path.
+
+**The fix:** Lowercase both sides of the comparison in each `matches()`
+function (`apiabuse.go` and `schema.go` - same root cause, same fix,
+applied identically in both). Deliberately kept as a plain
+`strings.ToLower` comparison rather than a shared helper or a
+precomputed-lowercase cache field, matching the existing code's style;
+this isn't a hot enough path to justify the extra abstraction.
+
+**Verified:** Rebuilt, reran the exact same isolated-instance comparison:
+mass-assignment now `400` regardless of case (`lowercase`, `UPPERCASE`,
+and `MiXeD` all tested); 6 uppercase-path failures now correctly trip
+`429` on the 6th, same as lowercase; a lowercase request against an
+already-uppercase-tripped lockout also correctly gets `429` - confirming
+the fix unifies state across case variants rather than just patching one
+direction. All existing unit tests in both packages still pass unchanged
+(`TestBlocksAfterMaxFailures`, `TestIsolatedPerIP`,
+`TestUnexpectedFieldRejected`, etc.). Full `scripts/test-attacks.sh`
+suite on a completely fresh instance: 14/14.
+
+---
+
 ## 9. WAF: server-side template injection payloads pass through unblocked
 
 **Found:** Writing `scripts/test-attacks.sh` — a one-shot suite covering

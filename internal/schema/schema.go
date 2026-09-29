@@ -101,7 +101,11 @@ func (v *Validator) match(r *http.Request) *compiledRule {
 		if rule.methods != nil && !rule.methods[strings.ToUpper(r.Method)] {
 			continue
 		}
-		if strings.HasPrefix(r.URL.Path, rule.pathPrefix) {
+		// Case-insensitive: see the identical fix/comment in
+		// internal/apiabuse/apiabuse.go's matches() - same root cause
+		// (Express's default case-insensitive routing vs. Go's
+		// case-sensitive strings.HasPrefix), same bypass, finding #10.
+		if strings.HasPrefix(strings.ToLower(r.URL.Path), strings.ToLower(rule.pathPrefix)) {
 			return &v.rules[i]
 		}
 	}

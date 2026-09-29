@@ -140,7 +140,13 @@ func (r compiledRule) matches(req *http.Request) bool {
 	if r.methods != nil && !r.methods[strings.ToUpper(req.Method)] {
 		return false
 	}
-	return strings.HasPrefix(req.URL.Path, r.PathPrefix)
+	// Case-insensitive: Express (what Juice Shop and most Node targets run)
+	// treats route paths as case-insensitive by default, so a request to
+	// "/REST/User/Login" reaches the same handler as "/rest/user/login".
+	// A case-sensitive prefix match here let that variant skip this rule
+	// entirely - a full bypass of brute-force lockout via a one-character
+	// case change. See finding #10 in docs/FINDINGS.md.
+	return strings.HasPrefix(strings.ToLower(req.URL.Path), strings.ToLower(r.PathPrefix))
 }
 
 // currentlyBlocked returns remaining block seconds, or 0 if not blocked.

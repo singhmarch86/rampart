@@ -147,3 +147,25 @@ func TestMethodFilter(t *testing.T) {
 		}
 	}
 }
+
+// Regression test for finding #10: a differently-cased path (e.g.
+// /LOGIN against a configured "/login" prefix) must still be watched -
+// Express (what most Node targets, including Juice Shop, run) treats
+// route paths as case-insensitive by default, so a case-sensitive prefix
+// match here let an attacker skip this rule entirely with a one-character
+// case change.
+func TestPathPrefixMatchIsCaseInsensitive(t *testing.T) {
+	g := newTestGuard(t, config.APIAbuseRule{
+		Name: "login", Methods: []string{"POST"}, PathPrefix: "/login",
+		FailureStatusCodes: []int{401}, MaxFailures: 2, Window: time.Minute, BlockDuration: time.Minute,
+	})
+	h := g.Middleware(upstream(http.StatusUnauthorized))
+
+	doRequest(h, "203.0.113.7", http.MethodPost, "/LOGIN")
+	doRequest(h, "203.0.113.7", http.MethodPost, "/Login")
+	// The third differently-cased request should now be blocked - proof
+	// the first two were actually counted, not silently unwatched.
+	if rec := doRequest(h, "203.0.113.7", http.MethodPost, "/lOgIn"); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected case-varied path to be watched and blocked, got %d", rec.Code)
+	}
+}

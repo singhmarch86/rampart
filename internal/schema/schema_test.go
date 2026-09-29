@@ -126,3 +126,17 @@ func TestBodyIsRestoredForUpstream(t *testing.T) {
 		t.Fatalf("expected upstream to see original body %q, got %q", body, seenBody)
 	}
 }
+
+// Regression test for finding #10: a differently-cased path must still be
+// validated - Express (what most Node targets, including Juice Shop, run)
+// treats route paths as case-insensitive by default, so a case-sensitive
+// prefix match here let a mass-assignment payload skip validation
+// entirely by hitting "/LOGIN" instead of the configured "/login".
+func TestPathPrefixMatchIsCaseInsensitive(t *testing.T) {
+	v := newTestValidator(t, loginSchema, "/login", "POST")
+	rec := doRequest(v.Middleware(okHandler()), http.MethodPost, "/LOGIN",
+		`{"email":"a@b.com","password":"x","isAdmin":true}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected case-varied path to still be validated and rejected with 400, got %d", rec.Code)
+	}
+}
