@@ -38,9 +38,10 @@ benchmarks/deployment/thesis close it out.
 16. Rampart — "Post: I finally pointed a scanner at my own code"
 17. Rampart — "LinkedIn — ModSecurity comparison" (strongest credibility post — good candidate to boost)
 18. Rampart — "Post: the gap the test suite itself found (finding #9)"
-19. Rampart — "LinkedIn — what it actually took to make the demo public"
-20. Rampart — "LinkedIn — rampart-analyze"
-21. Rampart — "LinkedIn — why self-hosted, for a security tool specifically" (closing thesis)
+19. Rampart — "Post: closing the gap the test suite found (finding #9, the fix)"
+20. Rampart — "LinkedIn — what it actually took to make the demo public"
+21. Rampart — "LinkedIn — rampart-analyze"
+22. Rampart — "LinkedIn — why self-hosted, for a security tool specifically" (closing thesis)
 
 ---
 
@@ -565,6 +566,38 @@ SSTI has led to real RCEs in the wild (Jinja2, Freemarker, Thymeleaf,
 Velocity). Logged it the same way as the other 8 findings: root cause,
 why it's not exploitable here, what a real fix looks like. Not fixed yet
 — that's next.
+
+[link to docs/FINDINGS.md#9]
+
+#buildinpublic #appsec #opensource
+
+---
+
+### Post: closing the gap the test suite found (finding #9, the fix)
+
+Follow-up to the SSTI gap the test suite found: it's closed now, and the
+root cause was more specific than "CRS doesn't cover this."
+
+Turns out CRS v4 *does* ship a rule aimed at this class of attack — id
+934180, matching `{% ... %}` and `<% ... %>`. Two reasons it never fired:
+it's gated to paranoia level 2, and Rampart runs at CRS's default, PL1.
+And even at PL2, that rule's own regex doesn't match bare `{{ ... }}` at
+all — which is the single most common SSTI proof-of-concept syntax
+(Jinja2/Twig/Mustache/Handlebars), and exactly what the test payload
+(`{{7*7}}`) used. Found this by reading the actual vendored rule source
+in the Go module cache, not by guessing from CRS's docs.
+
+Fix: a targeted custom rule, same anti-evasion pattern as the base64 gap
+from a few weeks back — requires an arithmetic operator or a known
+RCE/reflection primitive (`__class__`, `config.`, `exec(`, etc.) inside
+the double braces, not just any `{{...}}`. A legitimate Angular/Vue-style
+`{{user.name}}` has neither and passes through untouched — verified that
+directly, not assumed.
+
+Built the image locally, stood up an isolated test instance, threw four
+real SSTI variants at it (all blocked) and three benign double-brace
+lookalikes (all passed through clean), then re-ran the full test suite:
+14/14, up from 13/14.
 
 [link to docs/FINDINGS.md#9]
 
