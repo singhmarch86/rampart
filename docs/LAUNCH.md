@@ -39,9 +39,10 @@ benchmarks/deployment/thesis close it out.
 17. Rampart — "LinkedIn — ModSecurity comparison" (strongest credibility post — good candidate to boost)
 18. Rampart — "Post: the gap the test suite itself found (finding #9)"
 19. Rampart — "Post: closing the gap the test suite found (finding #9, the fix)"
-20. Rampart — "LinkedIn — what it actually took to make the demo public"
-21. Rampart — "LinkedIn — rampart-analyze"
-22. Rampart — "LinkedIn — why self-hosted, for a security tool specifically" (closing thesis)
+20. Rampart — "Post: the bypass hiding in a one-character case change (finding #10)"
+21. Rampart — "LinkedIn — what it actually took to make the demo public"
+22. Rampart — "LinkedIn — rampart-analyze"
+23. Rampart — "LinkedIn — why self-hosted, for a security tool specifically" (closing thesis)
 
 ---
 
@@ -600,6 +601,41 @@ lookalikes (all passed through clean), then re-ran the full test suite:
 14/14, up from 13/14.
 
 [link to docs/FINDINGS.md#9]
+
+#buildinpublic #appsec #opensource
+
+---
+
+### Post: the bypass hiding in a one-character case change (finding #10)
+
+After closing the SSTI gap, I went looking for the next bug instead of
+waiting for a test to trip over one. Found something worse.
+
+Two of Rampart's four detection layers — credential-stuffing lockout and
+mass-assignment schema validation — scope themselves by URL path prefix,
+matched with Go's `strings.HasPrefix`. Case-sensitive.
+
+Express (what Juice Shop, and most Node backends, run on) treats routes
+as case-insensitive by default. `/REST/User/Login` and `/rest/user/login`
+hit the exact same handler on the app side.
+
+So a mass-assignment payload (`isAdmin: true`) sent to `/rest/user/login`
+gets blocked — 400. The identical payload to `/REST/User/Login`? 401 —
+schema validation never ran, the app processed it directly. Six straight
+failed logins to the uppercase path: never once triggered the lockout
+that reliably fires on the 6th failure against the lowercase path.
+
+A one-character case change, and two of four protection layers just...
+don't apply. The WAF layer was unaffected — it isn't path-scoped — which
+is how I isolated this to exactly these two.
+
+Fix: lowercase both sides of the comparison. Verified on a fresh isolated
+instance both directions — the bypass is closed, and blocking state now
+correctly unifies across case variants (get locked out via the uppercase
+path, and the lowercase path is locked out too, same as it should always
+have been).
+
+[link to docs/FINDINGS.md#10]
 
 #buildinpublic #appsec #opensource
 
