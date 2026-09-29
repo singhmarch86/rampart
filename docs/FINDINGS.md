@@ -36,23 +36,41 @@ engine (a real, common vulnerability class — Jinja2, Freemarker,
 Thymeleaf, Velocity, etc. have all had real-world SSTI CVEs leading to
 RCE).
 
-**Status: documented, not yet fixed.** Left as a known, verified gap
-rather than silently working around it in the test script (the check
-stays in `scripts/test-attacks.sh` with an inline comment, and is expected
-to legitimately fail until this is addressed) or overclaiming it's
-covered. A fix would look like finding #2's: a targeted custom SecLang
-rule matching template-expression syntax across the handful of common
-engines, verified against both true positives and legitimate-looking
-`{{`/`}}`-containing input (Angular/Vue template literals in a request
-body, for instance) before shipping.
+**Root cause, precisely:** OWASP CRS v4 does ship an SSTI-adjacent rule
+(`934180` in `REQUEST-934-APPLICATION-ATTACK-GENERIC.conf`), but two
+things make it not apply here — confirmed by reading the actual vendored
+rule source in the Go module cache
+(`coraza-coreruleset/v4@v4.25.0`), not assumed:
+1. It's gated to paranoia level 2 (`tag:'paranoia-level/2'`); Rampart
+   runs at CRS's default, PL1, so the rule isn't even active.
+2. Even at PL2, its regex (`\{%[^%}]*%}|<%=?[^%>]*%>`) only matches
+   `{% ... %}` and `<% ... %>` - it does not match bare `{{ ... }}` at
+   all, which is the single most common SSTI proof-of-concept syntax
+   (Jinja2/Twig/Mustache/Handlebars) and exactly what `{{7*7}}` uses.
 
-**Verified:** Confirmed independently outside the test script (`curl -G
---data-urlencode 'q={{7*7}}' http://34.29.169.231:8080/rest/products/search`
-→ `200`, repeated on a fresh request after the demo had otherwise settled)
-and ruled out rate-limiting/lockout interference as the cause (a separate,
-unrelated timing issue hit the *same test run* — see the script's pacing
-comment — but the SSTI result was 200 both under load and after slowing
-requests down, so it isn't that).
+**The fix:** A targeted custom rule
+([`configs/waf-custom-rules/03-ssti-double-brace.conf`](../configs/waf-custom-rules/03-ssti-double-brace.conf)),
+same anti-evasion pattern as finding #2's base64 rule - narrow on
+purpose. It requires an arithmetic operator (`+-*/%`) or a known
+reflection/RCE primitive (`__class__`, `__import__`, `self.`, `config.`,
+`request.`, `constructor.`, `exec(`, `system(`, `popen(`, `__proto__`)
+inside the double braces, not just any `{{...}}` - so a legitimate
+Angular/Vue-style template string or plain `{{user.name}}` in submitted
+text has neither and passes through untouched. Active regardless of
+paranoia level, matching how the base64 rule is also PL-independent.
+
+**Verified:** Built the image locally (had to fall back to
+`DOCKER_BUILDKIT=0 docker build` - `docker compose build`'s buildx bake
+path hit an unrelated local permissions error on this machine) and ran it
+against an isolated Juice Shop container.
+- True positives, all `403`: the original `{{7*7}}`, plus
+  `{{7*'7'}}`, `{{ self.__class__ }}`, `{{ config.items() }}`.
+- False-positive checks, all `200`: `{{user.name}}`, `{{laptop}}`,
+  and empty `{{ }}`.
+- Normal traffic (`/`, a plain search) unaffected, still `200`.
+- Full `scripts/test-attacks.sh` suite re-run against the fixed local
+  instance: 14/14 passed, including this one - previously 13/14 with
+  this as the sole failure.
 
 ---
 
