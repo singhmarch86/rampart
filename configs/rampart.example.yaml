@@ -3,6 +3,18 @@
 # Address Rampart itself listens on.
 listen: ":8080"
 
+# Terminate TLS directly on Rampart's listeners (both the main proxy above
+# and the dashboard below, if enabled) using your own cert/key files — no
+# automatic certificate provisioning (no ACME/Let's Encrypt integration).
+# Bring a cert from Let's Encrypt (e.g. via certbot) or your own CA.
+# Leave disabled if TLS is already terminated upstream of Rampart (a load
+# balancer, an Ingress controller, Cloudflare) — that's the more common
+# setup and this is not required in that case.
+tls:
+  enabled: false
+  cert_file: ""
+  key_file: ""
+
 # The application Rampart protects. All allowed traffic is proxied here.
 upstream: "http://localhost:3000"
 

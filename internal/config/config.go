@@ -20,6 +20,21 @@ type Config struct {
 	Dashboard DashboardConfig        `yaml:"dashboard"`
 	OIDC      OIDCConfig             `yaml:"oidc"`
 	Logging   LoggingConfig          `yaml:"logging"`
+	TLS       TLSConfig              `yaml:"tls"`
+}
+
+// TLSConfig terminates TLS directly on Rampart's listeners (the main
+// proxy, and the dashboard if enabled) using operator-provided
+// certificate/key files - no ACME/auto-cert support, deliberately: that's
+// a meaningfully bigger feature (challenge handling, renewal, storage)
+// scoped out for now. Bring your own cert, from Let's Encrypt or
+// otherwise.
+type TLSConfig struct {
+	Enabled bool `yaml:"enabled"`
+	// CertFile and KeyFile are PEM-encoded, passed straight to
+	// http.Server.ListenAndServeTLS.
+	CertFile string `yaml:"cert_file"`
+	KeyFile  string `yaml:"key_file"`
 }
 
 type FirewallConfig struct {
@@ -355,6 +370,14 @@ func (c Config) Validate() error {
 					return fmt.Errorf("oidc.api_rbac.rules[%d]: path_prefix must not be empty", i)
 				}
 			}
+		}
+	}
+	if c.TLS.Enabled {
+		if c.TLS.CertFile == "" {
+			return fmt.Errorf("tls.cert_file must not be empty when tls is enabled")
+		}
+		if c.TLS.KeyFile == "" {
+			return fmt.Errorf("tls.key_file must not be empty when tls is enabled")
 		}
 	}
 	return nil

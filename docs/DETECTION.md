@@ -125,6 +125,45 @@ at all, because there's nothing content-wise to flag.
 
 ---
 
+## Out of scope, on purpose: network/transport-layer attacks
+
+Rampart is an L7 reverse proxy — every layer above inspects HTTP requests
+*after* a connection has already been established. That boundary means a
+few real attack classes are structurally outside what Rampart can detect,
+not because of a missing rule but because Rampart never sees the traffic
+in question at all.
+
+**Man-in-the-middle and DNS spoofing.** Both happen *before* a request
+reaches Rampart: a MITM intercepts the connection between the client and
+whatever terminates TLS; DNS spoofing redirects the client to a different
+IP entirely, one Rampart never receives traffic on. From Rampart's vantage
+point, an intercepted connection and a legitimate one are indistinguishable
+— it only ever sees the second hop.
+
+`tls.*` (see `configs/rampart.example.yaml`) lets Rampart terminate TLS
+directly with an operator-provided cert/key, which narrows this — but it's
+a mitigation, not detection, and the actual protection happens in the
+*client's* browser, not in Rampart. If a MITM'd or DNS-spoofed client
+connects to an attacker's endpoint instead of Rampart's, that attacker
+doesn't have Rampart's private key; the client's own certificate
+validation is what refuses the connection. Rampart itself still has zero
+visibility into an attempt happening elsewhere — enabling `tls.*` doesn't
+change that, it just makes the client-side defense possible to rely on.
+
+**Phishing.** A fake lookalike domain or a deceptive email never touches
+Rampart's request path at all — it's infrastructure Rampart doesn't sit in
+front of. The *aftermath* of phishing (an attacker using a stolen
+credential to log into the real app) is covered by the API-abuse guard's
+brute-force/credential-stuffing detection above, but that's a different
+claim: Rampart limits what a phished credential is worth, it doesn't
+detect the phishing itself.
+
+None of this is a roadmap item to "fix" — it's a permanent architectural
+boundary worth stating plainly, the same way `docs/ANALYZE.md` states
+what `rampart-analyze` can't claim from block-only event data.
+
+---
+
 ## Adding a new layer or rule class
 
 When a new detection mechanism ships, add a section here in the same

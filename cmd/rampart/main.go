@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,6 +22,18 @@ import (
 	"github.com/singhmarch86/rampart/internal/ratelimit"
 	"github.com/singhmarch86/rampart/internal/version"
 )
+
+// serve runs server, terminating TLS directly with the operator-provided
+// cert/key when tlsCfg is enabled - otherwise plain HTTP, same as before
+// this option existed. Shared by the proxy and dashboard listeners so
+// both get TLS from one config section rather than needing their own.
+func serve(server *http.Server, tlsCfg config.TLSConfig) error {
+	if !tlsCfg.Enabled {
+		return server.ListenAndServe()
+	}
+	server.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	return server.ListenAndServeTLS(tlsCfg.CertFile, tlsCfg.KeyFile)
+}
 
 func main() {
 	configPath := flag.String("config", "configs/rampart.yaml", "path to config file")
@@ -56,8 +69,12 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("rampart listening on %s, proxying to %s", cfg.Listen, cfg.Upstream)
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		scheme := "http"
+		if cfg.TLS.Enabled {
+			scheme = "https"
+		}
+		log.Printf("rampart listening on %s (%s), proxying to %s", cfg.Listen, scheme, cfg.Upstream)
+		if err := serve(server, cfg.TLS); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("server: %v", err)
 		}
 	}()
@@ -105,8 +122,12 @@ func main() {
 			ReadHeaderTimeout: 10 * time.Second,
 		}
 		go func() {
-			log.Printf("rampart dashboard listening on %s", cfg.Dashboard.Listen)
-			if err := dashboardServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			scheme := "http"
+			if cfg.TLS.Enabled {
+				scheme = "https"
+			}
+			log.Printf("rampart dashboard listening on %s (%s)", cfg.Dashboard.Listen, scheme)
+			if err := serve(dashboardServer, cfg.TLS); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				log.Fatalf("dashboard server: %v", err)
 			}
 		}()

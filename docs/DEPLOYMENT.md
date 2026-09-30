@@ -79,3 +79,11 @@ yourself before applying.
   authenticating proxy in front of it.
 - `configs/waf-custom-rules/` and `configs/schemas/` are how you extend
   detection without touching Go code — see their own READMEs.
+- **TLS:** most deployments terminate TLS *in front of* Rampart (a cloud
+  load balancer, an Ingress controller, Cloudflare) and leave `tls.enabled`
+  off — that's the common case and needs nothing here. If you'd rather
+  Rampart terminate TLS itself, set `tls.enabled: true` plus `cert_file` /
+  `key_file` (PEM, your own cert — no ACME/auto-provisioning). Applies to
+  both the main proxy and the dashboard listener. See the scope note in
+  [docs/DETECTION.md](DETECTION.md#out-of-scope-on-purpose-networktransport-layer-attacks)
+  for what this does and doesn't protect against.
