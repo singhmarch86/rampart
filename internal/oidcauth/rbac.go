@@ -95,7 +95,16 @@ func (g *RBACGuard) match(r *http.Request) *compiledRBACRule {
 		if rule.methods != nil && !rule.methods[strings.ToUpper(r.Method)] {
 			continue
 		}
-		if strings.HasPrefix(r.URL.Path, rule.pathPrefix) {
+		// Case-insensitive: see the identical fix/comment in
+		// internal/apiabuse/apiabuse.go's matches() and
+		// internal/schema/schema.go's match() - same root cause
+		// (Express's default case-insensitive routing vs. Go's
+		// case-sensitive strings.HasPrefix), same bypass pattern, but
+		// this instance (finding #11) is more severe: it's the actual
+		// authorization layer, so a case-varied path skipped token
+		// verification and the role check entirely, not just abuse
+		// detection.
+		if strings.HasPrefix(strings.ToLower(r.URL.Path), strings.ToLower(rule.pathPrefix)) {
 			return &g.rules[i]
 		}
 	}

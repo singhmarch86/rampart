@@ -125,6 +125,35 @@ func TestRBACUnrelatedPathNotGuarded(t *testing.T) {
 	}
 }
 
+// Regression test for finding #11: a differently-cased path (e.g.
+// /Admin/dashboard against a configured "/admin" PathPrefix) must still
+// require a valid token and the required role. Express (what most Node
+// backends run) treats routes as case-insensitive by default, so a
+// case-sensitive prefix match here let an unauthenticated request reach
+// a protected route - the most severe instance of the same bug pattern
+// already fixed in internal/apiabuse and internal/schema (finding #10),
+// since this is the actual authorization layer, not abuse detection.
+func TestRBACPathPrefixMatchIsCaseInsensitive(t *testing.T) {
+	mock := newMockOIDCProvider(t)
+	guard := newTestGuard(t, mock, config.APIRBACRule{
+		PathPrefix: "/admin", RequiredRoles: []string{"admin"},
+	})
+	// No token at all, case-varied path: must still be denied.
+	rec := doRequest(guard.Middleware(okHandler()), http.MethodGet, "/Admin/dashboard", "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected case-varied path to still require a token, got %d", rec.Code)
+	}
+	// Valid token but missing the required role, case-varied path: must
+	// still be denied (403), not silently forwarded.
+	token := mock.signToken(t, map[string]any{
+		"realm_access": map[string]any{"roles": []string{"viewer"}},
+	})
+	rec = doRequest(guard.Middleware(okHandler()), http.MethodGet, "/ADMIN/dashboard", token)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected case-varied path to still enforce required role, got %d", rec.Code)
+	}
+}
+
 func TestRBACAudienceCheckedWhenConfigured(t *testing.T) {
 	mock := newMockOIDCProvider(t)
 	guard := newTestGuard(t, mock, config.APIRBACRule{PathPrefix: "/admin", Audience: "rampart-api"})

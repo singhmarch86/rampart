@@ -11,6 +11,54 @@ Entries are newest first.
 
 ---
 
+## 11. OIDC RBAC guard: same path-case bypass, but on the authorization layer
+
+**Found:** Immediately after fixing finding #10 - rather than stopping at
+two fixed instances, checked whether the same `strings.HasPrefix`
+case-sensitivity pattern had been copy-pasted anywhere else.
+`grep -n "HasPrefix" internal/oidcauth/*.go` found a third, independent
+implementation in `internal/oidcauth/rbac.go`'s `match()`, structurally
+identical to the two already fixed.
+
+**The bug, and why it's more severe than #10:** `RBACGuard.Middleware`
+calls `g.match(r)`; if no rule matches, it calls `next.ServeHTTP(w, r)`
+directly - **no token verification, no role check, nothing.** Findings
+#10's two bugs skipped *abuse detection* layers (brute-force lockout,
+mass-assignment validation) - a meaningful gap, but the request still had
+to be independently valid to do anything. This one skips *authorization
+itself*. A route configured with `path_prefix: /admin` and
+`required_roles: [admin]` provides **zero protection** against a request
+to `/Admin/dashboard` - no bearer token required at all, regardless of
+role.
+
+**Verified with a regression test against the real mock-OIDC test harness
+(not curl against a live instance this time - the existing test
+infrastructure here, a real JWT-signing mock provider with discovery +
+JWKS, made this the more precise way to prove it):** wrote
+`TestRBACPathPrefixMatchIsCaseInsensitive` first, confirmed it failed
+against the unfixed code - a request to `/Admin/dashboard` with **no
+Authorization header at all** returned `200`, not `401`. Then applied the
+fix and confirmed it now correctly returns `401` with no token, and `403`
+for a valid token missing the required role, on both `/Admin/dashboard`
+and `/ADMIN/dashboard`.
+
+**The fix:** identical to finding #10 - lowercase both sides of the
+comparison in `rbac.go`'s `match()`. Same root cause (Express's default
+case-insensitive routing vs. Go's case-sensitive `strings.HasPrefix`),
+same one-line fix, now applied in all three places that independently
+implement path-scoped rule matching.
+
+**Verified:** `go build`, `go vet`, and the full `internal/oidcauth` suite
+pass (18 tests, including the new one and all 6 pre-existing RBAC tests
+unchanged). `gosec ./internal/oidcauth/...`: 0 issues. Worth noting what
+this finding is really about: the first fix (#10) wasn't "done" just
+because two call sites were patched - the underlying *pattern* (rolling
+your own case-sensitive path matching) needed checking everywhere it
+might have been duplicated, and it had been, a third time, in the most
+security-sensitive place of the three.
+
+---
+
 ## 10. API-abuse and schema validation: path-case bypass skips both layers
 
 **Found:** Deliberate adversarial pass after closing finding #9 - looked
