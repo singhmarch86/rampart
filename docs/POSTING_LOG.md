@@ -16,7 +16,7 @@ the "Posted" column yourself; leave it blank until you have.
 | 2 | Rampart | Try it yourself, live (real demo URLs) | 2026-09-28 | |
 | 3 | Rampart | Architecture thesis | 2026-09-29 | |
 | 4 | Rampart | Live demo recap | 2026-09-29 | |
-| 5 | Rampart | Finding #3 — credential-stuffing bypass | 2026-09-30 | |
+| 5 | Rampart | Finding #3 — credential-stuffing bypass | 2026-09-30 | 2026-09-30 |
 | - | Scryer | Why Scryer exists (gap-discovery story) | 2026-09-29 | on hold, per request |
 
 Add a row here every time a new draft is finalized and handed over —
