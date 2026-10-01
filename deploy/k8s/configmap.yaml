@@ -1,0 +1,44 @@
+# Plain-manifest ConfigMap, equivalent to what the Helm chart's
+# configmap.yaml template renders with its default values.yaml — edit
+# upstream below before applying (there's no sensible default).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rampart-config
+  labels:
+    app.kubernetes.io/name: rampart
+data:
+  rampart.yaml: |
+    listen: ":8080"
+    upstream: "http://CHANGE-ME:8080"
+
+    firewall:
+      allow: []
+      deny: []
+
+    waf:
+      enabled: true
+      mode: "block"
+      custom_rules_dir: ""
+
+    api_abuse:
+      enabled: false
+      rules: []
+
+    schema_validation:
+      enabled: false
+      rules: []
+
+    rate_limit:
+      enabled: true
+      requests_per_second: 10
+      burst: 20
+      max_concurrent_per_ip: 50
+      idle_timeout: 10m
+
+    dashboard:
+      enabled: true
+      listen: "0.0.0.0:9090"
+
+    logging:
+      events_path: "/data/rampart-events.jsonl"

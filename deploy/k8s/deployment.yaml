@@ -1,0 +1,69 @@
+# Plain-manifest Deployment, equivalent to the Helm chart's deployment.yaml
+# template with its default values.yaml. Same security posture: runs as
+# the distroless image's non-root UID, read-only root filesystem, /data
+# as the one writable mount (an emptyDir - not durable across pod
+# restarts; pair with your cluster's log shipping if you need durability).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rampart
+  labels:
+    app.kubernetes.io/name: rampart
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rampart
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rampart
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+      containers:
+        - name: rampart
+          image: rampart:latest
+          imagePullPolicy: IfNotPresent
+          args: ["-config", "/app/configs/rampart.yaml"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: proxy
+              containerPort: 8080
+            - name: dashboard
+              containerPort: 9090
+          readinessProbe:
+            tcpSocket:
+              port: proxy
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: proxy
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /app/configs/rampart.yaml
+              subPath: rampart.yaml
+              readOnly: true
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: config
+          configMap:
+            name: rampart-config
+        - name: data
+          emptyDir: {}

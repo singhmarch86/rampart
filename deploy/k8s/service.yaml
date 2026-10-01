@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rampart
+  labels:
+    app.kubernetes.io/name: rampart
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: rampart
+  ports:
+    - name: proxy
+      port: 8080
+      targetPort: proxy
+    - name: dashboard
+      port: 9090
+      targetPort: dashboard
