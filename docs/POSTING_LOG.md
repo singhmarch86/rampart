@@ -19,6 +19,7 @@ the "Posted" column yourself; leave it blank until you have.
 | 5 | Rampart | Finding #3 — credential-stuffing bypass | 2026-09-30 | 2026-09-30 |
 | 6 | Rampart | Finding #4 — the bug a screenshot caught | 2026-09-30 | |
 | 7 | Rampart | Finding #5 — the container that worked right up until it didn't | 2026-09-30 | |
+| 8 | Rampart | Finding #6 — the OIDC bug that would have broken RBAC for every user | 2026-10-01 | |
 | - | Scryer | Why Scryer exists (gap-discovery story) | 2026-09-29 | on hold, per request |
 
 Add a row here every time a new draft is finalized and handed over —
