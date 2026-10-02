@@ -40,9 +40,10 @@ benchmarks/deployment/thesis close it out.
 18. Rampart — "Post: the gap the test suite itself found (finding #9)"
 19. Rampart — "Post: closing the gap the test suite found (finding #9, the fix)"
 20. Rampart — "Post: the bypass hiding in a one-character case change (finding #10)"
-21. Rampart — "LinkedIn — what it actually took to make the demo public"
-22. Rampart — "LinkedIn — rampart-analyze"
-23. Rampart — "LinkedIn — why self-hosted, for a security tool specifically" (closing thesis)
+21. Rampart — "Post: the same bug, a third time, in the authorization layer (finding #11)"
+22. Rampart — "LinkedIn — what it actually took to make the demo public"
+23. Rampart — "LinkedIn — rampart-analyze"
+24. Rampart — "LinkedIn — why self-hosted, for a security tool specifically" (closing thesis)
 
 ---
 
@@ -638,6 +639,44 @@ have been).
 [link to docs/FINDINGS.md#10]
 
 #buildinpublic #appsec #opensource
+
+---
+
+### Post: the same bug, a third time, in the authorization layer (finding #11)
+
+I fixed a case-sensitivity bug in two places. Then I did the thing I
+should have done first: grepped the codebase for the same pattern.
+
+Third copy. In the OIDC role-based access control guard — the layer whose
+entire job is deciding who's allowed in.
+
+Here's why that one is worse. The guard asks "does this request match a
+protected path?" If yes, it checks the token and the role. If no, it
+passes the request straight through, with no checks at all. And the path
+match was case-sensitive.
+
+So with `/admin` configured to require an admin role, a request to
+`/Admin/dashboard` with no token whatsoever returned 200. Not a 403. Not
+a 401. The guard just didn't recognize the path as protected.
+
+The two earlier instances skipped abuse detection. This one skipped
+authorization itself.
+
+How I verified it: wrote the regression test first and watched it fail
+against the unfixed code. No Authorization header, 200 instead of 401.
+Then applied the fix and watched it pass. No token on `/Admin/dashboard`
+now gets 401, and a valid token without the admin role on `/ADMIN/dashboard`
+gets 403, same as on `/admin`.
+
+The part worth taking away isn't the one-line fix, it's that fixing two
+call sites didn't mean the bug was fixed. The pattern, hand-rolling
+case-sensitive path matching, had been copy-pasted, and the most
+security-sensitive copy was the one I hadn't looked at yet. After this
+one I swept the whole codebase. These three were the only instances.
+
+[link to docs/FINDINGS.md#11]
+
+#buildinpublic #appsec #oidc #golang
 
 ---
 
