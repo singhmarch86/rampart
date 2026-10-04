@@ -11,6 +11,57 @@ Entries are newest first.
 
 ---
 
+## 13. No read or idle timeouts: a slow client could hold connections open forever
+
+**Found:** Same network-layer review as #12. `cmd/rampart/main.go` set
+only `ReadHeaderTimeout` (10s) on both `http.Server`s. With `ReadTimeout`
+and `IdleTimeout` unset, nothing bounded how long a client could take to
+send a request body, or how long an idle keep-alive connection stayed open.
+
+**Impact:** availability only, not a data-exposure bug. A client that sends
+valid headers promptly and then drips the body (slowloris-style), or opens
+many connections and goes quiet, ties up connections indefinitely. The
+per-IP limits don't substitute for dropping stalled connections: an idle
+keep-alive socket isn't a request at all, a set of slow clients spread
+across many IPs stays under any per-IP cap, and none of this is a
+request-content attack the WAF can see.
+
+**Verified before fixing**, with the real binary and a raw-socket client:
+a connection that sent headers promising 1000 body bytes then sent one, and
+a keep-alive connection that finished a request then went silent, were both
+still open after 8 seconds with no limit anywhere.
+
+**The risk checked before fixing:** a naive `ReadTimeout` can interact badly
+with a reverse proxy and a server-sent-events dashboard. Tested in isolation
+first: with `ReadTimeout` at 2s, a handler that responds after 5s completed
+normally and its request context was not canceled. Go applies the read
+deadline to reading the request, not to how long the response takes.
+`WriteTimeout` is a different story (it would cut off long responses and
+the dashboard stream), so there is deliberately none.
+
+**The fix:** `server.read_timeout` (default 60s, whole request including
+body) and `server.idle_timeout` (default 120s), `0` disables, applied to
+both the proxy and dashboard listeners.
+
+**Verified after**, same binary and probes with both set to 3s: the
+slow-body connection and the idle connection were both closed by the
+server. Regression checks with `read_timeout` at 3s: a 5-second upstream
+response through Rampart still returned `200`, and the dashboard's
+`/api/stream` stayed open for the full 8 seconds. Full test suite, vet and
+gosec clean. Helm and k8s manifests need no change; the defaults apply
+when the section is absent.
+
+**Behavior change worth knowing:** the 60s default means a single request
+that takes longer than that to *upload* is now cut off. Raise
+`read_timeout` (or set it to `0`) for large uploads over slow links.
+
+**Known wart, not fixed:** a client cut off mid-body gets a `502` and an
+"upstream error" log line, because the proxy's error handler reports every
+failure that way. The connection is closed either way; `408` would be more
+accurate.
+
+---
+
 ## 12. Behind a load balancer, every client looked like the same IP
 
 **Found:** Asked "can we do more at the network layer?" and checked how

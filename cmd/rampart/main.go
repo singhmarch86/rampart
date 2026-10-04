@@ -67,6 +67,8 @@ func main() {
 		Addr:              cfg.Listen,
 		Handler:           p.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       cfg.Server.ReadTimeout,
+		IdleTimeout:       cfg.Server.IdleTimeout,
 	}
 
 	go func() {
@@ -127,6 +129,8 @@ func main() {
 			Addr:              cfg.Dashboard.Listen,
 			Handler:           dashboardHandler,
 			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       cfg.Server.ReadTimeout,
+			IdleTimeout:       cfg.Server.IdleTimeout,
 		}
 		go func() {
 			scheme := "http"

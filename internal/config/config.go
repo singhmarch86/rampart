@@ -23,11 +23,26 @@ type Config struct {
 	OIDC      OIDCConfig             `yaml:"oidc"`
 	Logging   LoggingConfig          `yaml:"logging"`
 	TLS       TLSConfig              `yaml:"tls"`
+	Server    ServerConfig           `yaml:"server"`
 	// TrustedProxies lists CIDRs/IPs of load balancers, Ingress controllers
 	// or CDNs directly in front of Rampart. Only connections from these
 	// peers have X-Forwarded-For honored when identifying the client; leave
 	// empty if clients connect to Rampart directly. See internal/realip.
 	TrustedProxies []string `yaml:"trusted_proxies"`
+}
+
+// ServerConfig bounds how long a client may hold a connection, for both the
+// proxy and dashboard listeners. There is deliberately no write timeout:
+// it would cut off slow-but-legitimate upstream responses and the
+// dashboard's live event stream, since Go applies it to the whole response.
+type ServerConfig struct {
+	// ReadTimeout is the max time to read an entire request including its
+	// body, so a client that sends headers then drips the body (slowloris)
+	// is cut off. It does not limit how long a response takes. 0 disables.
+	ReadTimeout time.Duration `yaml:"read_timeout"`
+	// IdleTimeout is how long an idle keep-alive connection is held open
+	// between requests. 0 disables (Go then falls back to ReadTimeout).
+	IdleTimeout time.Duration `yaml:"idle_timeout"`
 }
 
 // TLSConfig terminates TLS directly on Rampart's listeners (the main
@@ -263,6 +278,10 @@ func Default() Config {
 		Logging: LoggingConfig{
 			EventsPath: "rampart-events.jsonl",
 		},
+		Server: ServerConfig{
+			ReadTimeout: 60 * time.Second,
+			IdleTimeout: 120 * time.Second,
+		},
 	}
 }
 
@@ -378,6 +397,9 @@ func (c Config) Validate() error {
 				}
 			}
 		}
+	}
+	if c.Server.ReadTimeout < 0 || c.Server.IdleTimeout < 0 {
+		return fmt.Errorf("server.read_timeout and server.idle_timeout must not be negative (0 disables)")
 	}
 	if _, err := ipfilter.ParseCIDRs(c.TrustedProxies); err != nil {
 		return fmt.Errorf("trusted_proxies: %w", err)

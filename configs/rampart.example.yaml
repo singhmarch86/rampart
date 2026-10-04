@@ -15,6 +15,19 @@ tls:
   cert_file: ""
   key_file: ""
 
+# How long a client may hold a connection. Applies to the proxy and the
+# dashboard listener. These are the defaults; 0 disables a limit.
+server:
+  # Max time to read a whole request INCLUDING its body: cuts off a client
+  # that sends headers then drips the body. Does not limit response time, so
+  # slow upstream responses and the dashboard's live stream are unaffected.
+  # Raise it if you accept large uploads over slow links.
+  read_timeout: 60s
+  # How long an idle keep-alive connection is held between requests.
+  idle_timeout: 120s
+  # There is deliberately no write timeout (it would cut off long responses
+  # and the dashboard's event stream).
+
 # CIDRs/IPs of a load balancer, Ingress controller or CDN directly in front
 # of Rampart. Only connections FROM these have X-Forwarded-For honored when
 # identifying the client, so rate limiting, brute-force lockout, the IP

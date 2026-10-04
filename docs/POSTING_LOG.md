@@ -23,6 +23,7 @@ the "Posted" column yourself; leave it blank until you have.
 | 9 | Rampart | Finding #7 — the security tool whose own dashboard had zero rate limiting | 2026-10-02 | |
 | 10 | Rampart | Finding #8 — I finally pointed a scanner at my own code | 2026-10-02 | |
 | 11 | Rampart | ModSecurity comparison (reformatted: no table, softened "SEO junk" line) | 2026-10-03 | 2026-10-03 |
+| 12 | Rampart | Finding #9 — the gap the test suite itself found (two-parter, fix post is next) | 2026-10-04 | |
 | - | Scryer | Why Scryer exists (gap-discovery story) | 2026-09-29 | on hold, per request |
 
 Add a row here every time a new draft is finalized and handed over —
