@@ -8,6 +8,7 @@ data:
   rampart.yaml: |
     listen: ":{{ .Values.service.proxyPort }}"
     upstream: {{ .Values.upstream | quote }}
+    trusted_proxies: {{ .Values.trustedProxies | toJson }}
 
     firewall:
       allow: []

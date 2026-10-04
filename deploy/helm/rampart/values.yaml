@@ -9,6 +9,15 @@ replicaCount: 1
 # For an in-cluster app: http://<service-name>.<namespace>.svc.cluster.local:<port>
 upstream: ""
 
+# CIDRs/IPs of whatever sits directly in front of Rampart (Ingress
+# controller pods, cloud load balancer, CDN). Only connections from these
+# have X-Forwarded-For honored. IMPORTANT behind an Ingress: leave this
+# empty and every client looks like the Ingress pod, so the rate limit and
+# brute-force lockout act on all users at once. Cluster-specific, so there
+# is no default - use your Ingress controller's pod/node CIDR.
+trustedProxies: []
+# - "10.0.0.0/8"
+
 service:
   type: ClusterIP
   proxyPort: 8080

@@ -15,18 +15,20 @@ type Filter struct {
 // New builds a Filter from CIDR strings (e.g. "10.0.0.0/8", "203.0.113.5/32").
 // A bare IP without a prefix is treated as a /32 (or /128 for IPv6).
 func New(allow, deny []string) (*Filter, error) {
-	a, err := parseCIDRs(allow)
+	a, err := ParseCIDRs(allow)
 	if err != nil {
 		return nil, fmt.Errorf("allow list: %w", err)
 	}
-	d, err := parseCIDRs(deny)
+	d, err := ParseCIDRs(deny)
 	if err != nil {
 		return nil, fmt.Errorf("deny list: %w", err)
 	}
 	return &Filter{allow: a, deny: d}, nil
 }
 
-func parseCIDRs(entries []string) ([]*net.IPNet, error) {
+// ParseCIDRs parses CIDR strings or bare IPs into networks; also used by
+// the realip package for trusted_proxies so both accept the same syntax.
+func ParseCIDRs(entries []string) ([]*net.IPNet, error) {
 	nets := make([]*net.IPNet, 0, len(entries))
 	for _, e := range entries {
 		if _, _, err := net.ParseCIDR(e); err != nil {

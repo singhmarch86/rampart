@@ -1,5 +1,5 @@
 // Package proxy assembles the reverse proxy and its enforcement middleware
-// chain: IP filter -> rate limit -> OIDC RBAC -> API-abuse guard -> schema
+// chain: real-IP resolution -> IP filter -> rate limit -> OIDC RBAC -> API-abuse guard -> schema
 // validation -> WAF -> upstream. Ordering matters: OIDC RBAC runs before
 // the deeper checks so an unauthorized request never reaches them; the
 // API-abuse guard wraps everything downstream of it so it observes the
@@ -22,6 +22,7 @@ import (
 	"github.com/singhmarch86/rampart/internal/ipfilter"
 	"github.com/singhmarch86/rampart/internal/oidcauth"
 	"github.com/singhmarch86/rampart/internal/ratelimit"
+	"github.com/singhmarch86/rampart/internal/realip"
 	"github.com/singhmarch86/rampart/internal/schema"
 	"github.com/singhmarch86/rampart/internal/waf"
 )
@@ -99,6 +100,14 @@ func New(cfg config.Config, logger *events.Logger) (*Proxy, error) {
 	}
 	handler = ratelimit.Middleware(limiter, "ratelimit", logger, handler)
 	handler = withIPFilter(handler, filter, logger)
+	// Outermost, so every layer above (including the IP filter) sees the
+	// real client IP rather than the load balancer's. No-op when
+	// trusted_proxies is empty.
+	resolver, err := realip.New(cfg.TrustedProxies)
+	if err != nil {
+		return nil, fmt.Errorf("initializing trusted_proxies: %w", err)
+	}
+	handler = resolver.Middleware(handler)
 
 	return &Proxy{handler: handler, limiter: limiter, abuseGuard: abuseGuard}, nil
 }

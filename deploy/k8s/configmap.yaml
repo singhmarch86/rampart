@@ -12,6 +12,11 @@ data:
     listen: ":8080"
     upstream: "http://CHANGE-ME:8080"
 
+    # Set to your Ingress controller's pod/node CIDR if traffic arrives via
+    # one. Left empty, every client looks like the Ingress pod and the rate
+    # limit / brute-force lockout act on all users at once.
+    trusted_proxies: []
+
     firewall:
       allow: []
       deny: []

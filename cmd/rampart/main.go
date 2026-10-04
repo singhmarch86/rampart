@@ -20,6 +20,7 @@ import (
 	"github.com/singhmarch86/rampart/internal/oidcauth"
 	"github.com/singhmarch86/rampart/internal/proxy"
 	"github.com/singhmarch86/rampart/internal/ratelimit"
+	"github.com/singhmarch86/rampart/internal/realip"
 	"github.com/singhmarch86/rampart/internal/version"
 )
 
@@ -115,6 +116,12 @@ func main() {
 			)
 			dashboardHandler = ratelimit.Middleware(dashboardLimiter, "dashboard-ratelimit", logger, dashboardHandler)
 		}
+
+		resolver, err := realip.New(cfg.TrustedProxies)
+		if err != nil {
+			log.Fatalf("trusted_proxies: %v", err)
+		}
+		dashboardHandler = resolver.Middleware(dashboardHandler)
 
 		dashboardServer = &http.Server{
 			Addr:              cfg.Dashboard.Listen,

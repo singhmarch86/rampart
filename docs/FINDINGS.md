@@ -11,6 +11,59 @@ Entries are newest first.
 
 ---
 
+## 12. Behind a load balancer, every client looked like the same IP
+
+**Found:** Asked "can we do more at the network layer?" and checked how
+Rampart identifies clients. `grep -rn "RemoteAddr\|X-Forwarded"` showed
+the rate limiter, brute-force lockout, WAF, RBAC and schema layers each
+derive the client IP from `r.RemoteAddr` alone, and nothing reads
+`X-Forwarded-For`. That's right for a directly exposed Rampart. It's wrong
+for the deployment modes this repo documents: behind a cloud load
+balancer, an Ingress controller (the Helm and `kubectl apply` paths), or a
+CDN, `RemoteAddr` is the proxy, for every user.
+
+**Impact:** per-IP features collapse into one global bucket. One attacker
+tripping the login lockout locks out every legitimate user; the per-IP
+rate limit becomes a single shared limit; `firewall.deny` can only ever
+block the proxy itself, and the event log and dashboard attribute all
+traffic to one "attacker IP".
+
+**Verified before fixing**, with a real binary and a stub upstream that
+always returns 401 (lockout after 2 failures): client A (header
+`X-Forwarded-For: 203.0.113.1`) failed twice and was locked out. Client B
+(`203.0.113.2`), a different user who had never failed once, was locked
+out on their first attempt: `429`.
+
+**The fix:** a `trusted_proxies` allowlist and an outermost middleware
+(`internal/realip`) that rewrites `r.RemoteAddr` to the real client, so
+every layer is fixed without touching five call sites. The header is
+honored only when the direct peer is a listed proxy; the chain is walked
+right to left, skipping trusted hops, and the first untrusted address is
+the client. Trusting the header from anyone would be its own
+vulnerability (a client could pick its own IP to dodge lockouts), hence
+an allowlist and not a switch. Empty by default, which is a no-op, so
+direct-exposure deployments are unchanged. Applied to both the proxy and
+the dashboard listener, and wired into the Helm chart and k8s manifests.
+
+**Verified after:** same scenario with the proxy trusted: A locked out on
+the third attempt, B's first attempt `401`, tracked separately. With
+`trusted_proxies` set to a range that doesn't include the peer, the
+header was ignored and B was locked out again, so a spoofed header buys
+nothing. 11 unit tests cover trusted/untrusted peers, a spoofed leftmost
+entry, multiple trusted hops, all-trusted chains, malformed or missing
+headers, multi-line headers, IPv6 and bare-IP entries. `go vet`, full
+test suite and gosec clean; `helm lint` and `helm template` pass with and
+without the new value.
+
+**Not covered:** only `X-Forwarded-For`; the standardized `Forwarded`
+header, `X-Real-IP` and PROXY protocol aren't read. This assumes a trusted
+proxy appends the address it saw to `X-Forwarded-For` (standard for
+cloud load balancers and Ingress controllers). One that forwards a
+client-supplied header untouched, without appending, would let clients
+spoof; list only proxies you control.
+
+---
+
 ## 11. OIDC RBAC guard: same path-case bypass, but on the authorization layer
 
 **Found:** Immediately after fixing finding #10 - rather than stopping at

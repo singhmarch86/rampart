@@ -15,6 +15,16 @@ tls:
   cert_file: ""
   key_file: ""
 
+# CIDRs/IPs of a load balancer, Ingress controller or CDN directly in front
+# of Rampart. Only connections FROM these have X-Forwarded-For honored when
+# identifying the client, so rate limiting, brute-force lockout, the IP
+# filter and the WAF act on the real client. Leave empty if clients connect
+# to Rampart directly (then the header is ignored, so it can't be spoofed).
+# Behind a proxy with this left empty, every user looks like the proxy and
+# one attacker's lockout hits everyone. See docs/FINDINGS.md #12.
+trusted_proxies: []
+# - "10.0.0.0/8"
+
 # The application Rampart protects. All allowed traffic is proxied here.
 upstream: "http://localhost:3000"
 

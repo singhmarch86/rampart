@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/singhmarch86/rampart/internal/ipfilter"
 )
 
 type Config struct {
@@ -21,6 +23,11 @@ type Config struct {
 	OIDC      OIDCConfig             `yaml:"oidc"`
 	Logging   LoggingConfig          `yaml:"logging"`
 	TLS       TLSConfig              `yaml:"tls"`
+	// TrustedProxies lists CIDRs/IPs of load balancers, Ingress controllers
+	// or CDNs directly in front of Rampart. Only connections from these
+	// peers have X-Forwarded-For honored when identifying the client; leave
+	// empty if clients connect to Rampart directly. See internal/realip.
+	TrustedProxies []string `yaml:"trusted_proxies"`
 }
 
 // TLSConfig terminates TLS directly on Rampart's listeners (the main
@@ -371,6 +378,9 @@ func (c Config) Validate() error {
 				}
 			}
 		}
+	}
+	if _, err := ipfilter.ParseCIDRs(c.TrustedProxies); err != nil {
+		return fmt.Errorf("trusted_proxies: %w", err)
 	}
 	if c.TLS.Enabled {
 		if c.TLS.CertFile == "" {

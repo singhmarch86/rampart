@@ -79,6 +79,12 @@ yourself before applying.
   authenticating proxy in front of it.
 - `configs/waf-custom-rules/` and `configs/schemas/` are how you extend
   detection without touching Go code — see their own READMEs.
+- **Behind a load balancer, Ingress or CDN, set `trusted_proxies`**
+  (Helm: `trustedProxies`) to that proxy's CIDR. Left empty, every user
+  looks like the proxy: one attacker's login lockout hits everyone, and
+  per-IP rate limiting becomes one shared limit. Only listed proxies get
+  `X-Forwarded-For` honored, so the header can't be spoofed by direct
+  clients. Details in [docs/FINDINGS.md #12](FINDINGS.md).
 - **TLS:** most deployments terminate TLS *in front of* Rampart (a cloud
   load balancer, an Ingress controller, Cloudflare) and leave `tls.enabled`
   off — that's the common case and needs nothing here. If you'd rather
