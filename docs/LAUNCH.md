@@ -47,6 +47,39 @@ benchmarks/deployment/thesis close it out.
 
 ---
 
+## LinkedIn — v2 format test: "try to break it" (hold until the demo has a domain + HTTPS)
+
+Why this exists: the long story-format posts reached ~9,000 impressions
+but sent about one tracked visit to the repo (GitHub Traffic, 14 days).
+The link sat below "see more" and pointed at a raw `http://` IP. This
+version leads with the hook, keeps the link in the first lines, and gives
+a reason to click. Success measure: unique visitors from outside GitHub in
+the repo's Traffic > Referring sites panel over the following 7 days.
+
+Replace `[DOMAIN]` once the demo is served over HTTPS. Attach one image:
+a screenshot of the dashboard's "Top block reasons" panel, or a terminal
+showing `{{7*7}}` returning 403.
+
+**Body:**
+
+Try to break my firewall. It's live, and it's meant to be attacked.
+
+https://[DOMAIN] is Rampart, a self-hosted WAF I built, sitting in front
+of a deliberately vulnerable app (OWASP Juice Shop).
+
+Try a SQL injection in the search box. Try `{{7*7}}`: that one slipped
+past it until I found the gap and fixed it. Hammer the login and watch it
+lock you out. https://[DOMAIN]:9090 shows what it blocks, live.
+
+If you find a bypass, I want to hear it. 14 real findings are already
+logged with root cause and fix, including bugs in my own code.
+
+Repo: https://github.com/singhmarch86/rampart
+
+#appsec #opensource #waf
+
+---
+
 ## Show HN (news.ycombinator.com)
 
 **Title:** `Show HN: Rampart – self-hosted WAF/rate-limiter/OIDC gateway, one binary`

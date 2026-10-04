@@ -6,7 +6,15 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/rampart ./cmd/rampart
+# Set by the release workflow so `rampart -version` reports the real tag and
+# commit; a plain `docker build` leaves them as "dev" / "unknown".
+ARG VERSION=dev
+ARG COMMIT=unknown
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
+    -ldflags="-s -w \
+      -X github.com/singhmarch86/rampart/internal/version.Version=${VERSION} \
+      -X github.com/singhmarch86/rampart/internal/version.Commit=${COMMIT}" \
+    -o /out/rampart ./cmd/rampart
 
 # /app (binary + default config) is owned by root and read-only at runtime —
 # deliberate for a distroless image. Anything the process needs to WRITE

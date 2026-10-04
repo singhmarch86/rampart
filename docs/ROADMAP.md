@@ -3,7 +3,7 @@
 | Phase | Scope |
 |---|---|
 | 0. Foundations | Repo scaffold, license, architecture doc |
-| 1. Network-layer core | Reverse proxy, IP allow/deny, rate limiting, geo-blocking, connection-flood mitigation, YAML rule config |
+| 1. Network-layer core | Reverse proxy, IP allow/deny, per-IP rate and concurrency limiting, YAML rule config — **done**. Geo-blocking was in the original plan and is **not implemented**; connection-level protection shipped later as read/idle timeouts (see 7.8) |
 | 2. Application WAF | Coraza + OWASP CRS integration, custom rule DSL, validated against OWASP Juice Shop |
 | 3. API / mobile-backend protection | Credential-stuffing detection, token-abuse detection, REST/GraphQL schema validation |
 | 4. Attack analytics dashboard | Event pipeline, local storage, web dashboard |
@@ -14,6 +14,7 @@
 | 7.5 Hardening pass | RP-initiated logout, dashboard rate limiting — **done**, see docs/FINDINGS.md #7 and docs/OIDC.md |
 | 7.6 Self-scan | `govulncheck` + `gosec` against Rampart's own Go source, wired into CI — **done**, see docs/FINDINGS.md #8 |
 | 7.7 Offline attack triage | `rampart-analyze`: a separate binary that turns a window of the block-event log into a Markdown triage report (top attackers, multi-vector IPs, traffic bursts), optionally narrated by an LLM (Anthropic API, BYO key) — **done**, see docs/ANALYZE.md. Deliberately scoped down from an earlier "auto-suggest new WAF rules" idea once it became clear the block-only event log (no payload, no allowed-traffic record) can't support that — see "Considered and parked" below. |
+| 7.8 Network-layer hardening | Path-case bypass fixes across API-abuse, schema validation and RBAC; optional TLS termination (bring your own cert); `trusted_proxies` for correct client IPs behind a load balancer; read/idle timeouts — **done**, see docs/FINDINGS.md #10-#13 |
 
 ## Considered and parked
 

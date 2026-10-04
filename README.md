@@ -3,12 +3,41 @@
 [![CI](https://github.com/singhmarch86/rampart/actions/workflows/ci.yml/badge.svg)](https://github.com/singhmarch86/rampart/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-A self-hosted, open-core firewall and attack-analytics platform. Rampart sits
-in front of your application as a reverse proxy and blocks network-, application-,
-and API-layer attacks in one place, then gives you a single dashboard to see
-what was blocked and why.
+A self-hosted firewall in one Go binary: a WAF (Coraza + OWASP Core Rule Set),
+rate limiting, brute-force lockout, JSON Schema request validation, optional
+OIDC role enforcement, and a live attack dashboard. Rampart sits in front of
+your application as a reverse proxy and blocks attacks at the network,
+application and API layers, then shows you what was blocked and why.
 
 **[Full documentation index →](DOCUMENTATION.md)**
+
+## Try it in a minute
+
+```sh
+git clone https://github.com/singhmarch86/rampart && cd rampart
+docker compose up
+```
+
+That runs Rampart in front of OWASP Juice Shop, a deliberately vulnerable app.
+Attack it at `http://localhost:8080` (try a SQL injection in the search box)
+and watch what gets blocked on the dashboard at `http://localhost:9090`.
+To protect your own app instead, see [Quick start](#quick-start) below.
+
+## Evidence, not claims
+
+- **Benchmarked against ModSecurity** with GoTestWAF: 63.12% vs 63.27% at
+  baseline (within noise), 65.25% with one custom rule. Numbers and
+  reproduction steps: [benchmarks/RESULTS.md](benchmarks/RESULTS.md).
+- **14 bugs, vulnerabilities and doc errors found in Rampart itself** during
+  development, each with root cause, fix and how the fix was verified:
+  [docs/FINDINGS.md](docs/FINDINGS.md).
+- **It says what it can't do.** Network-layer attacks like MITM and DNS
+  spoofing, and phishing are outside what an L7 proxy can see:
+  [docs/DETECTION.md](docs/DETECTION.md#out-of-scope-on-purpose-networktransport-layer-attacks).
+
+## How a request flows
+
+<img src="docs/architecture-request-path.svg" alt="Rampart request path: IP filter, rate limiter, optional OIDC RBAC guard, API-abuse guard, schema validation, WAF, then the upstream app" width="340">
 
 ## Why
 
@@ -25,7 +54,7 @@ Rampart itself during development and how it was fixed.
 
 ## Scope
 
-- **Network layer** — IP allow/deny lists, rate limiting, geo-blocking, connection-flood mitigation
+- **Network layer** — IP allow/deny lists, per-IP rate and concurrency limits, request read/idle timeouts, real-client-IP resolution behind a load balancer (`trusted_proxies`), optional TLS termination. Not implemented: geo-blocking, volumetric DDoS protection (see [docs/NETWORK_HARDENING.md](docs/NETWORK_HARDENING.md) for where that belongs).
 - **Application layer (WAF)** — OWASP Top 10 detection via the Coraza engine + OWASP Core Rule Set
 - **API / mobile-backend layer** — credential-stuffing detection, token-abuse detection, request-schema validation
 - **Analytics** — attack timeline, top attackers, rule-hit dashboard. See [docs/DETECTION.md](docs/DETECTION.md) for how each layer decides what counts as an attack.

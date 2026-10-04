@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased (to be tagged v0.2.0)
+
+Everything since v0.1.1. The first version published as a tagged GitHub
+release with a Docker image on `ghcr.io` (see the note under v0.1.0).
+
+**Security fixes** (each with root cause, fix and verification in
+[docs/FINDINGS.md](docs/FINDINGS.md)):
+- Server-side template injection (`{{7*7}}`) was not blocked; custom WAF
+  rule added (#9).
+- A one-character path-case change (`/REST/User/Login`) bypassed the
+  brute-force lockout, mass-assignment validation, and, most seriously,
+  OIDC role enforcement (#10, #11).
+- Behind a load balancer every client looked like the same IP, so one
+  attacker's lockout hit everyone; `trusted_proxies` added (#12).
+- No read or idle timeouts, so slow clients could hold connections open
+  indefinitely; `server.read_timeout` / `server.idle_timeout` added (#13).
+- README and roadmap claimed geo-blocking, which was never implemented;
+  corrected (#14).
+
+**New:**
+- Optional TLS termination with your own cert/key (`tls.*`).
+- `rampart -version`, plus a `NOTICE` file and filled-in copyright.
+- Plain Kubernetes manifests in `deploy/k8s/` for `kubectl apply`.
+- `rampart-analyze`: offline triage report from the block-event log.
+- `scripts/test-attacks.sh`: one-payload-per-class attack suite for a
+  running instance.
+- Release workflow publishing the image to `ghcr.io` on a version tag.
+
+**Behavior change:** requests slower than 60s to *upload* are now cut off
+by the default `server.read_timeout`; raise it or set it to `0` for large
+uploads over slow links.
+
 ## v0.1.1 — hardening pass
 
 Two real gaps closed, both verified live against a real Keycloak instance
@@ -15,7 +47,11 @@ Two real gaps closed, both verified live against a real Keycloak instance
 
 ## v0.1.0 — initial release
 
-First public release. All of the following is implemented, tested, and
+*Note: v0.1.0 and v0.1.1 were development milestones and were never tagged
+or published as GitHub releases or images; v0.2.0 above is the first
+tagged release.*
+
+First public repository state. All of the following is implemented, tested, and
 verified against real running targets (OWASP Juice Shop, a real Keycloak
 instance) — see [docs/FINDINGS.md](docs/FINDINGS.md) for the bugs found
 and fixed along the way, and [benchmarks/RESULTS.md](benchmarks/RESULTS.md)

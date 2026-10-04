@@ -11,6 +11,41 @@ Entries are newest first.
 
 ---
 
+## 14. The README and roadmap claimed geo-blocking, which doesn't exist
+
+**Found:** While reviewing what a stranger sees on the repo's front page,
+the README's scope list read "IP allow/deny lists, rate limiting,
+geo-blocking, connection-flood mitigation", and `docs/ROADMAP.md` listed
+the same as shipped in phase 1. `grep -rniE "geo|maxmind|country"` over
+the Go code, configs and docs found no implementation: the IP filter is
+CIDR allow/deny only, there is no GeoIP database or lookup anywhere.
+Geo-blocking was in the original plan and was never built; the docs kept
+describing the plan as if it were the product.
+
+**Impact:** not a security hole, a credibility one. Someone evaluating a
+security tool who checks a headline feature and finds it missing will
+reasonably discount everything else. The "connection-flood mitigation"
+wording was also generous for what existed at the time (per-IP rate and
+concurrency limits).
+
+**The fix:** README and roadmap now describe what is implemented (per-IP
+rate and concurrency limits, read/idle timeouts, real-client-IP
+resolution, optional TLS termination), and say plainly that geo-blocking
+and volumetric DDoS protection are not implemented. The roadmap phase-1
+row keeps the history: geo-blocking was planned, not built.
+
+**Verified:** a repo-wide search for geo-blocking terms found exactly two
+places that claimed it (the README scope list and the roadmap's phase-1
+row). Both now say it is not implemented; the only remaining mentions are
+those honest ones.
+
+**Why it's logged here:** the rest of this file is bugs found by testing
+behavior. This one was found by reading the docs as a skeptical reader
+would, and it's the same class of problem (the tool not matching its own
+description) one level up.
+
+---
+
 ## 13. No read or idle timeouts: a slow client could hold connections open forever
 
 **Found:** Same network-layer review as #12. `cmd/rampart/main.go` set
