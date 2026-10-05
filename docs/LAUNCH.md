@@ -80,6 +80,147 @@ Repo: https://github.com/singhmarch86/rampart
 
 ---
 
+## LinkedIn series — WAF tips (educational, one tip per post)
+
+Short, hook-first posts that teach something useful and don't depend on
+anyone caring about Rampart yet. Tips 1-8 come from bugs found and
+verified in Rampart itself (linked); tips 9-10 are general WAF knowledge
+that was not tested here, so keep them worded as general advice. Pair one
+a week with the demo link once the demo has a domain and HTTPS. Don't
+claim Rampart does anything beyond what its docs say.
+
+### Tip 1: WAF path rules must ignore case
+
+A WAF rule that protects `/admin` with a case-sensitive match is bypassed
+by `/Admin` whenever the backend is case-insensitive. Express is by
+default.
+
+I found this in three places in my own firewall, including the one that
+enforces roles: a request with no token at all returned 200. After fixing
+the first two, grep for the same pattern everywhere. The third copy was
+the worst one.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#11-oidc-rbac-guard-same-path-case-bypass-but-on-the-authorization-layer
+
+#appsec #waf #golang
+
+### Tip 2: behind a load balancer, tell your WAF which proxies to trust
+
+Without it, every user looks like the load balancer's IP. One attacker
+trips the login lockout and everyone is locked out; per-IP rate limits
+become one shared limit.
+
+The fix is a list of trusted proxies, and honoring `X-Forwarded-For` only
+from them. Trust the header from anyone and a client can pick its own IP
+to dodge every limit.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#12-behind-a-load-balancer-every-client-looked-like-the-same-ip
+
+#appsec #waf #kubernetes
+
+### Tip 3: check which paranoia level a rule needs
+
+OWASP CRS ships a template-injection rule. It never fired for me, for two
+reasons: it only runs at paranoia level 2, and its pattern doesn't match
+`{{ }}` at all, the most common injection syntax.
+
+I found that by reading the actual rule source, not the docs. If a
+category matters to you, test it with a real payload and check which
+level its rule needs.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#9-waf-server-side-template-injection-payloads-pass-through-unblocked
+
+#appsec #waf #owasp
+
+### Tip 4: test your WAF with encoded payloads
+
+At CRS's default level, 0% of the base64-encoded attacks in my benchmark
+were blocked. It doesn't decode everything on purpose, because that would
+flag legitimate data like tokens and images.
+
+One narrow custom rule (decode, then run the same detectors) closed the
+gap, and the false-positive rate didn't move. Whatever WAF you run, send
+it the attacks in encoded form too.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#2-waf-0-block-rate-on-base64-encoded-attack-payloads
+
+#appsec #waf #owasp
+
+### Tip 5: measure false positives, not just blocks
+
+A WAF that blocks everything has perfect detection and is useless. When
+you benchmark, report the false-positive rate next to the block rate.
+
+When I added a rule that raised the score by about 2 points, the number I
+cared about was that the false-positive rate stayed exactly the same.
+
+https://github.com/singhmarch86/rampart/blob/main/benchmarks/RESULTS.md
+
+#appsec #waf #benchmarking
+
+### Tip 6: only a real success should reset a lockout counter
+
+If any non-failure response resets the brute-force counter, an attacker
+interleaves one real password guess with one junk request that fails
+differently. The counter never reaches the limit.
+
+Only a genuine success should reset it. Everything else leaves it alone.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#3-api-abuse-guard-failure-streak-reset-let-attackers-dodge-lockout
+
+#appsec #waf #authentication
+
+### Tip 7: validate the shape of a request, not just its content
+
+`{"email": "a@b.com", "password": "x", "isAdmin": true}` contains nothing
+a signature would flag. A JSON Schema that forbids unexpected fields on
+the login endpoint rejects it anyway.
+
+Some attacks have no malicious-looking string in them. The problem is a
+field that shouldn't be there.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/DETECTION.md#3-schema-validation--shape-not-signature
+
+#appsec #waf #api
+
+### Tip 8: don't put a write timeout on a streaming proxy
+
+Read and idle timeouts stop slow-body and idle-connection attacks. A write
+timeout looks like the same kind of protection, but it cuts off legitimate
+long responses and live event streams.
+
+I tested it: with a 3s read timeout, a 5s upstream response and an open
+live stream still worked, while the slow clients were dropped.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#13-no-read-or-idle-timeouts-a-slow-client-could-hold-connections-open-forever
+
+#appsec #waf #golang
+
+### Tip 9: one rule hit can be enough to block (general advice)
+
+CRS doesn't count rule hits. It adds up points per hit and blocks at a
+threshold. By default the threshold is 5 and one critical rule is worth
+5, which is why block reasons read "Total Score: 20".
+
+When you're chasing a false positive, add a targeted exclusion for that
+rule instead of raising the threshold for everything.
+
+#appsec #waf #owasp
+
+### Tip 10: a WAF buys time, it doesn't fix the bug (general advice)
+
+A WAF blocks known patterns before they reach the app. It's a speed bump,
+not a fix: fix the vulnerable code too.
+
+And know what it can't see: DOM-based XSS, business-logic flaws, and
+authorization bugs where the request looks perfectly normal.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/DETECTION.md#out-of-scope-on-purpose-networktransport-layer-attacks
+
+#appsec #waf #security
+
+---
+
 ## Show HN (news.ycombinator.com)
 
 **Title:** `Show HN: Rampart – self-hosted WAF/rate-limiter/OIDC gateway, one binary`

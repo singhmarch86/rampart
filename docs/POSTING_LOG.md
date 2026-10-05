@@ -31,6 +31,14 @@ whether from the calendar in `LAUNCH.md` or a one-off. Use the post's
 short name from `LAUNCH.md`'s "Suggested LinkedIn posting order" list
 where one exists, so the two documents stay easy to cross-reference.
 
+## WAF tips series
+
+Ten short educational posts saved in `LAUNCH.md` under "LinkedIn series —
+WAF tips" (Tip 1 to Tip 10). Saved, not yet handed over as finalized text.
+Tips 1-8 are from verified Rampart findings; 9-10 are general advice. Also
+saved: the "try to break it" v2-format post, held until the demo has a
+domain and HTTPS. Add a row to the main table above when one is handed over.
+
 ## Other platforms
 
 LinkedIn is the only channel actually in progress. Drafts for these exist
