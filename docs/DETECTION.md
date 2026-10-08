@@ -193,6 +193,27 @@ None of this is a roadmap item to "fix" — it's a permanent architectural
 boundary worth stating plainly, the same way `docs/ANALYZE.md` states
 what `rampart-analyze` can't claim from block-only event data.
 
+## gRPC and protobuf: not supported
+
+Binary protobuf bodies and gRPC traffic do not work through Rampart today.
+Tested with a real gRPC server (health service: a unary call and a
+server-streaming call) behind a local Rampart, using the client and server
+in `scripts/grpc-probe/`:
+
+| Path | Result |
+|---|---|
+| Client straight to the gRPC server (control) | works, stream delivers messages |
+| Via Rampart over TLS, WAF off | **502**: the proxy speaks HTTP/1.1 to the upstream, and a gRPC server only speaks HTTP/2 |
+| Via Rampart over TLS, WAF on | **403** on both calls, even for a harmless health check: the CRS scored the binary request at 18 (threshold 5) |
+| Via Rampart on plain HTTP | fails at connection setup: the plain listener does not do HTTP/2 without TLS (h2c) |
+
+So there is no gRPC protocol coverage to describe: it is blocked, or
+broken, before any rule could say anything about its content. Independently
+of that, the WAF cannot see inside a protobuf message (Coraza has no
+protobuf body processor), and schema validation is JSON-only. Not tested,
+because the upstream hop fails first: streaming through the WAF's response
+buffering, and HTTP/2 trailers. See finding #17.
+
 ---
 
 ## Adding a new layer or rule class

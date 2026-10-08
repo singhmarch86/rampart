@@ -41,7 +41,7 @@ inline samples: [docs/manual.html](docs/manual.html).
 
 | Doc | What it covers |
 |---|---|
-| [docs/FINDINGS.md](docs/FINDINGS.md) | Every real bug or vulnerability found in Rampart itself during development (16 so far), with root cause, fix (or stated status), and how it was verified |
+| [docs/FINDINGS.md](docs/FINDINGS.md) | Every real bug or vulnerability found in Rampart itself during development (17 so far), with root cause, fix (or stated status), and how it was verified |
 | [benchmarks/RESULTS.md](benchmarks/RESULTS.md) | GoTestWAF benchmark results, including a from-scratch comparison against standalone ModSecurity (the trustworthy external baseline published numbers online don't provide) |
 | [docs/SELF-ASSESSMENT.md](docs/SELF-ASSESSMENT.md) | `scripts/security-assessment.sh`: nmap/openssl/curl checks of a running deployment (open ports, TLS versions, risky methods, block-page leaks), with real results and what was not run |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Phase-by-phase build history, what's done, what's deliberately parked and why |

@@ -28,7 +28,7 @@ To protect your own app instead, see [Quick start](#quick-start) below.
 - **Benchmarked against ModSecurity** with GoTestWAF: 63.12% vs 63.27% at
   baseline (within noise), 65.25% with one custom rule. Numbers and
   reproduction steps: [benchmarks/RESULTS.md](benchmarks/RESULTS.md).
-- **16 bugs, vulnerabilities and doc errors found in Rampart itself** during
+- **17 bugs, vulnerabilities and doc errors found in Rampart itself** during
   development, each with root cause, fix and how the fix was verified:
   [docs/FINDINGS.md](docs/FINDINGS.md).
 - **It says what it can't do.** Network-layer attacks like MITM and DNS
@@ -56,7 +56,7 @@ Rampart itself during development and how it was fixed.
 
 - **Network layer** — IP allow/deny lists, per-IP rate and concurrency limits, request read/idle timeouts, real-client-IP resolution behind a load balancer (`trusted_proxies`), optional TLS termination. Not implemented: geo-blocking, volumetric DDoS protection (see [docs/NETWORK_HARDENING.md](docs/NETWORK_HARDENING.md) for where that belongs).
 - **Application layer (WAF)** — OWASP Top 10 detection via the Coraza engine + OWASP Core Rule Set
-- **API / mobile-backend layer** — credential-stuffing detection, token-abuse detection, request-schema validation
+- **API / mobile-backend layer** — credential-stuffing detection, token-abuse detection, request-schema validation. HTTP/JSON only: gRPC and protobuf traffic does not work through Rampart (see [docs/DETECTION.md](docs/DETECTION.md#grpc-and-protobuf-not-supported)).
 - **Analytics** — attack timeline, top attackers, rule-hit dashboard. See [docs/DETECTION.md](docs/DETECTION.md) for how each layer decides what counts as an attack.
 - **Offline attack triage** — `rampart-analyze` turns a window of the block-event log into a Markdown report (top attackers, multi-vector IPs, traffic bursts), optionally narrated by an LLM. Separate binary, no dependency in the core proxy. See [docs/ANALYZE.md](docs/ANALYZE.md) for what it can and can't tell you.
 - **Cloud-native** — Docker image, Helm chart, Terraform module

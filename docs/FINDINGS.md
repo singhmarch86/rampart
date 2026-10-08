@@ -11,6 +11,42 @@ Entries are newest first.
 
 ---
 
+## 17. gRPC (and protobuf) traffic does not work through Rampart
+
+**Found:** Asked whether Rampart could find gRPC-protocol vulnerabilities, I
+tested instead of answering from the design. A first probe with protobuf
+bodies (`application/x-protobuf`, `application/grpc`) returned 403 for every
+request, including a clean one. A real gRPC server and Go client
+(`scripts/grpc-probe/`: the standard health service, one unary call and one
+server-streaming call) then isolated the causes.
+
+**Verified, four setups, same client:**
+- Direct to the gRPC server: both calls work (stream delivered 9 messages).
+- Via Rampart on TLS with the WAF off: `502`. The proxy log shows the
+  upstream hop failing: Rampart's transport speaks HTTP/1.1 to an `http://`
+  upstream and the gRPC server answered with an HTTP/2 frame.
+- Via Rampart on TLS with the WAF on: `403` for both calls. The block event
+  is "Inbound Anomaly Score Exceeded (Total Score: 18)" on a plain health
+  check. I did not determine which CRS rules contributed (that is what the
+  matched-rule-IDs spec is for).
+- Via Rampart on plain HTTP (either WAF setting): connection setup fails
+  ("frame header looked like an HTTP/1.1 header"); the plain listener does
+  not accept HTTP/2 without TLS.
+
+**Impact:** anyone putting a gRPC service behind Rampart gets an outage, and
+`api_abuse`, `schema_validation` and the WAF offer no gRPC coverage. This is
+a missing capability, not a regression, and nothing in the README claimed
+gRPC support, but it was also not stated anywhere.
+
+**Status: documented, not fixed.** Now stated in `docs/DETECTION.md`. A fix
+would need an HTTP/2 upstream transport, a way to let gRPC content types past
+the CRS content-type policy, and a decision on streaming (the WAF buffers
+whole responses, which cannot work for long-lived streams). Streaming and
+trailer behavior were not tested, because the upstream hop fails first.
+Decoding protobuf fields for the SQLi/XSS rules is a separate, larger piece.
+
+---
+
 ## 16. Detect mode records nothing
 
 **Found:** While specifying a change to include matched rule IDs in block

@@ -20,6 +20,9 @@ release with a Docker image on `ghcr.io` (see the note under v0.1.0).
   mode first" workflow showed an empty log; it now records `detect` events
   for requests it would have blocked, kept separate from block counts in the
   dashboard and `rampart-analyze` (#16).
+- gRPC/protobuf traffic does not work through the proxy (HTTP/1.1 upstream
+  hop, WAF blocks binary bodies); documented with a reproducible probe in
+  `scripts/grpc-probe/`, not fixed (#17).
 - README and roadmap claimed geo-blocking, which was never implemented;
   corrected (#14).
 
