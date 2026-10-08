@@ -18,6 +18,12 @@ upstream: ""
 trustedProxies: []
 # - "10.0.0.0/8"
 
+# Hostnames the deployment serves; any other Host (or X-Forwarded-Host) gets
+# a 403, which blocks Host-header poisoning such as forged password-reset
+# links. Empty disables the check. "*.example.com" wildcards are supported.
+allowedHosts: []
+# - "shop.example.com"
+
 service:
   type: ClusterIP
   proxyPort: 8080

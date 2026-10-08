@@ -9,6 +9,7 @@ data:
     listen: ":{{ .Values.service.proxyPort }}"
     upstream: {{ .Values.upstream | quote }}
     trusted_proxies: {{ .Values.trustedProxies | toJson }}
+    allowed_hosts: {{ .Values.allowedHosts | toJson }}
 
     firewall:
       allow: []

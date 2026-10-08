@@ -156,6 +156,49 @@ at all, because there's nothing content-wise to flag.
 
 ---
 
+## 5. Host allow-list — which names this deployment serves
+
+Config: `allowed_hosts` (a list; empty disables the layer). Event layer:
+`hostguard`.
+
+An application that builds an absolute URL from the request's `Host` or
+`X-Forwarded-Host` lets an attacker choose the domain inside that URL. The
+usual victim is the password-reset email: request a reset for someone else's
+account with `Host: evil.example`, and the real service emails them a link to
+the attacker's server carrying a valid reset token. It is a phishing link
+sent from the legitimate service, and no content rule can recognise it,
+because `evil.example` is an ordinary hostname. Only the operator knows which
+names are legitimate, so this layer takes that list.
+
+It rejects, with a 403 and a `hostguard` block event, any request whose
+`Host` is missing or not on the list, or that names an unlisted host in
+`X-Forwarded-Host`, `X-Host` or the `host=` of `Forwarded`. Every
+comma-separated element and every repeated header line is checked. Matching
+is case-insensitive and ignores a trailing dot; `example.com` matches any
+port, `example.com:8443` only that port, and `*.example.com` matches
+subdomains but not `example.com` itself. Malformed values (spaces, `@`, `/`,
+a non-numeric port) never match. The block reason is a fixed string, not the
+offending value, so probes do not each become a separate dashboard row.
+
+Placement: after the IP filter and rate limiter, before the OIDC, API-abuse,
+schema and WAF layers. It does not cover the dashboard port.
+
+Measured (before, WAF at paranoia level 1, bare file server behind): `Host:
+evil.example`, `X-Forwarded-Host: evil.example` and a bare-IP `Host` all
+passed. After, with `allowed_hosts: [shop.example.com, "*.shop.example.com"]`
+on the real binary: allowed hosts (including a subdomain and a port) returned
+200; `Host: evil.example`, a bare-IP `Host`, a good `Host` with
+`X-Forwarded-Host: evil.example`, and a good `Host` with `Forwarded:
+host=evil.example` all returned 403, each logged once as `hostguard`.
+
+Limits: it protects only deployments that set the list. A wildcard entry
+trusts every subdomain, so a taken-over subdomain is accepted. It does not
+stop open redirects or injected links in pages, which are separate gaps (see
+below); it also does not make an application that trusts `Host` safe from
+anything other than a hostname the operator did not list.
+
+---
+
 ## Out of scope, on purpose: network/transport-layer attacks
 
 Rampart is an L7 reverse proxy — every layer above inspects HTTP requests
@@ -187,7 +230,12 @@ front of. The *aftermath* of phishing (an attacker using a stolen
 credential to log into the real app) is covered by the API-abuse guard's
 brute-force/credential-stuffing detection above, but that's a different
 claim: Rampart limits what a phished credential is worth, it doesn't
-detect the phishing itself.
+detect the phishing itself. What it can do is shut one phishing enabler that
+does reach it: Host-header poisoning of password-reset links, via
+`allowed_hosts` (section 5). Open redirects (`/redirect?to=https://evil`) and
+an injected `<a href>` in a reflected page are not blocked: CRS has no rule
+for either, so the application has to validate redirect targets and encode
+output.
 
 None of this is a roadmap item to "fix" — it's a permanent architectural
 boundary worth stating plainly, the same way `docs/ANALYZE.md` states

@@ -54,7 +54,7 @@ Rampart itself during development and how it was fixed.
 
 ## Scope
 
-- **Network layer** — IP allow/deny lists, per-IP rate and concurrency limits, request read/idle timeouts, real-client-IP resolution behind a load balancer (`trusted_proxies`), optional TLS termination. Not implemented: geo-blocking, volumetric DDoS protection (see [docs/NETWORK_HARDENING.md](docs/NETWORK_HARDENING.md) for where that belongs).
+- **Network layer** — IP allow/deny lists, a Host-header allow-list (`allowed_hosts`, stops forged password-reset links), per-IP rate and concurrency limits, request read/idle timeouts, real-client-IP resolution behind a load balancer (`trusted_proxies`), optional TLS termination. Not implemented: geo-blocking, volumetric DDoS protection (see [docs/NETWORK_HARDENING.md](docs/NETWORK_HARDENING.md) for where that belongs).
 - **Application layer (WAF)** — OWASP Top 10 detection via the Coraza engine + OWASP Core Rule Set
 - **API / mobile-backend layer** — credential-stuffing detection, token-abuse detection, request-schema validation. HTTP/JSON only: gRPC and protobuf traffic does not work through Rampart (see [docs/DETECTION.md](docs/DETECTION.md#grpc-and-protobuf-not-supported)).
 - **Analytics** — attack timeline, top attackers, rule-hit dashboard. See [docs/DETECTION.md](docs/DETECTION.md) for how each layer decides what counts as an attack.

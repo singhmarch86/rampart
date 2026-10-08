@@ -31,6 +31,9 @@ release with a Docker image on `ghcr.io` (see the note under v0.1.0).
   level. Measured tradeoff in `benchmarks/RESULTS.md`: level 2 raises
   detection but wrongly blocked 38% of GoTestWAF's legitimate samples
   (9% at level 1), so try it in `mode: detect` first.
+- `allowed_hosts`: reject requests whose `Host` or `X-Forwarded-Host` is not
+  a name you serve, which stops Host-header poisoning (forged
+  password-reset links). Off by default; Helm `allowedHosts`.
 - Optional TLS termination with your own cert/key (`tls.*`).
 - `rampart -version`, plus a `NOTICE` file and filled-in copyright.
 - Plain Kubernetes manifests in `deploy/k8s/` for `kubectl apply`.

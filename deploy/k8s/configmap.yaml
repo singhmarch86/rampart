@@ -17,6 +17,11 @@ data:
     # limit / brute-force lockout act on all users at once.
     trusted_proxies: []
 
+    # Hostnames you serve; any other Host or X-Forwarded-Host gets a 403
+    # (blocks Host-header poisoning, e.g. forged password-reset links).
+    # Empty disables the check.
+    allowed_hosts: []
+
     firewall:
       allow: []
       deny: []

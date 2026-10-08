@@ -19,6 +19,7 @@ import (
 	"github.com/singhmarch86/rampart/internal/apiabuse"
 	"github.com/singhmarch86/rampart/internal/config"
 	"github.com/singhmarch86/rampart/internal/events"
+	"github.com/singhmarch86/rampart/internal/hostguard"
 	"github.com/singhmarch86/rampart/internal/ipfilter"
 	"github.com/singhmarch86/rampart/internal/oidcauth"
 	"github.com/singhmarch86/rampart/internal/ratelimit"
@@ -97,6 +98,15 @@ func New(cfg config.Config, logger *events.Logger) (*Proxy, error) {
 		}
 		rbacGuard := oidcauth.NewRBACGuard(provider, cfg.OIDC.APIRBAC, cfg.OIDC.RolesClaim, logger)
 		handler = rbacGuard.Middleware(handler)
+	}
+	// After the IP filter and rate limiter (they wrap this), so a flood of
+	// requests with bad Host headers is rate limited like any other traffic.
+	if len(cfg.AllowedHosts) > 0 {
+		hostGuard, err := hostguard.New(cfg.AllowedHosts)
+		if err != nil {
+			return nil, err
+		}
+		handler = hostGuard.Middleware(logger, handler)
 	}
 	handler = ratelimit.Middleware(limiter, "ratelimit", logger, handler)
 	handler = withIPFilter(handler, filter, logger)

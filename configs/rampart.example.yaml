@@ -38,6 +38,18 @@ server:
 trusted_proxies: []
 # - "10.0.0.0/8"
 
+# Hostnames this deployment serves. When non-empty, a request whose Host
+# header (or X-Forwarded-Host, X-Host or Forwarded host=) names anything else
+# gets a 403. This stops Host-header poisoning, the attack that makes an app
+# put an attacker's domain in password-reset links. Empty (default) disables
+# the check. Entries: "example.com" (any port), "example.com:8443" (that port
+# only), "*.example.com" (subdomains, not example.com itself). List every name
+# clients use, and the names your load balancer sends if it rewrites Host.
+# Does not apply to the dashboard port. See docs/DETECTION.md.
+allowed_hosts: []
+# - "shop.example.com"
+# - "*.shop.example.com"
+
 # The application Rampart protects. All allowed traffic is proxied here.
 upstream: "http://localhost:3000"
 

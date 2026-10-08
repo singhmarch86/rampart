@@ -85,6 +85,13 @@ yourself before applying.
   per-IP rate limiting becomes one shared limit. Only listed proxies get
   `X-Forwarded-For` honored, so the header can't be spoofed by direct
   clients. Details in [docs/FINDINGS.md #12](FINDINGS.md).
+- **Set `allowed_hosts`** (Helm: `allowedHosts`) to the hostnames you
+  serve. Any other `Host` or `X-Forwarded-Host` gets a 403, which stops the
+  attack that puts an attacker's domain into password-reset links. Include
+  every name your load balancer or Ingress forwards. Off by default.
+  Kubernetes probes here are TCP checks, so they are unaffected; an HTTP
+  probe would send the pod IP as `Host` and be rejected unless you add that
+  or set the probe's host header.
 - **TLS:** most deployments terminate TLS *in front of* Rampart (a cloud
   load balancer, an Ingress controller, Cloudflare) and leave `tls.enabled`
   off — that's the common case and needs nothing here. If you'd rather

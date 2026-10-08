@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/singhmarch86/rampart/internal/hostguard"
 	"github.com/singhmarch86/rampart/internal/ipfilter"
 )
 
@@ -29,6 +30,11 @@ type Config struct {
 	// peers have X-Forwarded-For honored when identifying the client; leave
 	// empty if clients connect to Rampart directly. See internal/realip.
 	TrustedProxies []string `yaml:"trusted_proxies"`
+	// AllowedHosts, when non-empty, restricts the Host header (and
+	// X-Forwarded-Host, X-Host and Forwarded host=) to these names; anything
+	// else gets a 403. Empty disables the check. Entries are hostnames,
+	// "host:port", or "*.example.com" wildcards. See internal/hostguard.
+	AllowedHosts []string `yaml:"allowed_hosts"`
 }
 
 // ServerConfig bounds how long a client may hold a connection, for both the
@@ -413,6 +419,9 @@ func (c Config) Validate() error {
 	}
 	if _, err := ipfilter.ParseCIDRs(c.TrustedProxies); err != nil {
 		return fmt.Errorf("trusted_proxies: %w", err)
+	}
+	if _, err := hostguard.New(c.AllowedHosts); err != nil {
+		return err
 	}
 	if c.TLS.Enabled {
 		if c.TLS.CertFile == "" {
