@@ -42,6 +42,16 @@ Tips 1-8 are from verified Rampart findings; 9-10 are general advice. Also
 saved: the "try to break it" v2-format post, held until the demo has a
 domain and HTTPS. Add a row to the main table above when one is handed over.
 
+## New material, October 2026
+
+Saved in `LAUNCH.md` under "LinkedIn — new material since the first batch",
+not yet handed over as finalized text: the false README claim (#14), the
+CRS probe (#15), the measured paranoia-level tradeoff, "what Rampart
+replaces and what it doesn't", the fix post for #15, and an optional post
+sharing the real traffic numbers. Add a row to the main table when one is
+handed over. Also still held: a v0.2.0 release post (not drafted until the
+tag and image exist).
+
 ## Other platforms
 
 LinkedIn is the only channel actually in progress. Drafts for these exist

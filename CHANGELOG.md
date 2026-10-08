@@ -32,7 +32,10 @@ release with a Docker image on `ghcr.io` (see the note under v0.1.0).
   running instance.
 - `scripts/test-crs-coverage.sh`: one canary per OWASP CRS category,
   mapping what the default paranoia level does and doesn't block. Found
-  that XXE and two template-injection syntaxes are not blocked (#15).
+  that XXE and two template-injection syntaxes were not blocked, both now
+  fixed at the default level (#15).
+- XML external-entity (XXE) check in the WAF middleware, and the template
+  rule extended to `{% %}` and `<% %>` syntaxes.
 - Release workflow publishing the image to `ghcr.io` on a version tag.
 
 **Behavior change:** requests slower than 60s to *upload* are now cut off

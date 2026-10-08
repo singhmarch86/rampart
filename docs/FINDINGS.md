@@ -88,10 +88,47 @@ the level closes the template gap, but at a cost most deployments won't
 accept without tuning, which supports fixing known gaps with narrow custom
 rules (as #9 did) rather than turning the dial up.
 
-**Status:** the setting exists; the gaps themselves are not fixed at the
-default level. Still to build, following #9's pattern: a narrow custom rule
-for XXE declarations, and extending `03-ssti-double-brace.conf` to the
-`{% %}` and `<%= %>` syntaxes.
+**The fix (both real gaps, at the default level):**
+- **Template syntaxes:** `03-ssti-double-brace.conf` now also covers
+  `{% ... %}` and `<% ... %>` / `<%= ... %>`, with the same narrow design as
+  the `{{ }}` rule (an operator between two operands, a known dangerous
+  primitive, or `import`/`include`/`extends` inside the tags), and it now
+  inspects XML text values too.
+- **XXE:** a check in the Go middleware (`internal/waf/waf.go`) that blocks
+  an XML request body declaring an external general or parameter entity,
+  logged as a normal WAF block and respecting `mode: detect`. It's in Go, not
+  a SecLang rule, because a rule can't be written for it: tested directly,
+  for an XML body `REQUEST_BODY` and `REQUEST_BODY_LENGTH` are empty (they
+  work for a form body) and the parser exposes only text values, so the
+  DOCTYPE is unreachable. My first attempt, a SecLang rule, blocked nothing
+  and the tests caught it.
+
+**A second mistake the tests caught:** my first template regex tried to skip
+an opener's marker character (`<%-`) by "consuming it first", but the regex
+engine just matched the `-` as an operator instead, wrongly blocking the
+benign `<%- name %>`. Fixed by requiring an operator to sit between two
+operands; the benign case is now a test.
+
+**Verified, with the real binary against Juice Shop at level 1:**
+- Coverage probe: 22 of 23 pass (was 19). XXE and both template syntaxes are
+  blocked, and the XXE block is logged request-side with its own reason.
+  The one miss is bare `;id` (level 3 only, above).
+- Core attack suite (`test-attacks.sh`): 14 of 14, no regressions.
+- GoTestWAF at level 1: legitimate samples passed 90.78%, identical to
+  before, so no new false positives on that set; application-security
+  detection 56.21% to 56.97%, overall 65.32% to 65.51%.
+- Unit tests load the real shipped rules and cover both sides: blocked
+  (`{% print 7*7 %}`, `<%= 7*7 %>`, `{% import os %}`, external, parameter
+  and PUBLIC entities, lowercase keywords) and left alone (`{{user.name}}`,
+  `use {% tags %} in Jinja`, `<%- name %>`, `100% sure`, plain XML, an XHTML
+  doctype with no entity), plus detect mode for XXE.
+
+**Not covered, stated plainly:** an internal entity (`<!ENTITY a "text">`,
+the "billion laughs" shape), XML in an encoding the WAF doesn't decode
+(e.g. UTF-16), and bare `;id` below level 3. The real defense against XXE is
+disabling external entities in the application's XML parser.
+
+**Status:** fixed at the default level, except for the limits above.
 
 ---
 

@@ -15,10 +15,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,7 +41,28 @@ const (
 type WAF struct {
 	engine coraza.WAF
 	logger *events.Logger
+	// detectOnly mirrors mode "detect": matches are logged but not blocked.
+	detectOnly bool
 }
+
+// XXE detection lives here, not in a SecLang rule, because the rule language
+// can't see what it needs: for an XML request body Coraza's XML processor
+// exposes only the parsed text values (XML:/*), and REQUEST_BODY and
+// REQUEST_BODY_LENGTH are empty. An external entity declaration sits in the
+// DOCTYPE, outside those values, so no rule can match it (verified with a
+// rule on each variable; see docs/FINDINGS.md #15). The middleware already
+// holds the raw bytes, so it checks them directly.
+//
+// Blocks a body that declares an external general or parameter entity
+// (`<!ENTITY n SYSTEM ...>`, `<!ENTITY n PUBLIC ...>`, `<!ENTITY % n ...>`).
+// An ordinary `<!DOCTYPE html PUBLIC ...>` declares no entity and does not
+// match. Not matched: an internal entity (`<!ENTITY a "text">`) and XML in an
+// encoding the WAF doesn't decode (e.g. UTF-16). The real defense is turning
+// off external entities in the application's XML parser.
+var (
+	xmlContentType = regexp.MustCompile(`(?i)^(?:application|text)/(?:[a-z0-9.+-]+\+)?xml`)
+	xxeDeclaration = regexp.MustCompile(`(?i)<!ENTITY\s+(?:%\s+)?[^\s>]+\s+(?:SYSTEM|PUBLIC)\b`)
+)
 
 // New builds a WAF from cfg. It always loads the Coraza-recommended base
 // config and the OWASP Core Rule Set; cfg.Mode controls whether matches are
@@ -100,7 +123,7 @@ func New(cfg config.WAFConfig, logger *events.Logger) (*WAF, error) {
 		return nil, fmt.Errorf("initializing Coraza WAF: %w", err)
 	}
 
-	return &WAF{engine: engine, logger: logger}, nil
+	return &WAF{engine: engine, logger: logger, detectOnly: cfg.Mode == "detect"}, nil
 }
 
 // loadCustomRules concatenates every *.conf file in dir, sorted by filename
@@ -180,6 +203,12 @@ func (w *WAF) Middleware(next http.Handler) http.Handler {
 				return
 			}
 		}
+		if len(bodyBytes) > 0 && xmlContentType.MatchString(r.Header.Get("Content-Type")) &&
+			xxeDeclaration.Match(bodyBytes) {
+			if w.blockXXE(rw, r) {
+				return
+			}
+		}
 		if len(bodyBytes) > 0 {
 			if it, _, err := tx.WriteRequestBody(bodyBytes); err != nil {
 				http.Error(rw, "bad request", http.StatusBadRequest)
@@ -238,6 +267,33 @@ func (w *WAF) Middleware(next http.Handler) http.Handler {
 		rw.WriteHeader(rec.status)
 		_, _ = rw.Write(rec.body.Bytes())
 	})
+}
+
+// blockXXE rejects a request whose XML body declares an external entity,
+// logging it like any other WAF block. In detect mode it only logs and
+// returns false so the request continues. It reports whether it responded.
+func (w *WAF) blockXXE(rw http.ResponseWriter, r *http.Request) bool {
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		ip = r.RemoteAddr
+	}
+	const reason = "Request body declares an external XML entity (XXE)"
+	if w.detectOnly {
+		// %q on everything request-derived: the path is attacker-controlled
+		// (same reasoning as proxy.go), and the address can be rewritten from
+		// a forwarded header when trusted_proxies is set.
+		// #nosec G706 -- gosec's taint check doesn't account for %q
+		// escaping; the CR/LF this rule warns about can't survive %q (same
+		// suppression and reasoning as internal/proxy/proxy.go, finding #8).
+		log.Printf("waf: detect mode, would block (%s) from %q: %q %q", reason, ip, r.Method, r.URL.Path)
+		return false
+	}
+	w.logger.Log(events.Event{
+		Action: events.ActionBlock, Layer: "waf", Reason: reason,
+		ClientIP: ip, Method: r.Method, Path: r.URL.Path,
+	})
+	http.Error(rw, "forbidden", http.StatusForbidden)
+	return true
 }
 
 func (w *WAF) block(rw http.ResponseWriter, r *http.Request, tx types.Transaction, it *types.Interruption) {

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/singhmarch86/rampart/internal/config"
@@ -127,5 +128,95 @@ func TestCustomRuleBlocks(t *testing.T) {
 	rec = doRequest(t, w.Middleware(okHandler()), http.MethodGet, "/public/ok")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected unrelated path to pass, got %d", rec.Code)
+	}
+}
+
+// The tests below load the real shipped rules directory, not a copy, so a
+// typo in a shipped regex can't pass unnoticed. Each checks both sides: what
+// must be blocked, and what must be left alone (the false-positive guard).
+func newShippedRulesWAF(t *testing.T) http.Handler {
+	t.Helper()
+	w := newTestWAF(t, config.WAFConfig{
+		Enabled: true, Mode: "block", ParanoiaLevel: 1,
+		CustomRulesDir: filepath.Join("..", "..", "configs", "waf-custom-rules"),
+	})
+	return w.Middleware(okHandler())
+}
+
+func doBodyRequest(t *testing.T, h http.Handler, contentType, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/rest/products/search", strings.NewReader(body))
+	req.Header.Set("Content-Type", contentType)
+	req.RemoteAddr = "203.0.113.1:12345"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// Finding #15: CRS has no request rule for external entity declarations at
+// any paranoia level, and a SecLang rule can't be written for it because
+// the XML processor leaves REQUEST_BODY empty; the middleware checks the
+// raw bytes itself (xxeDeclaration in waf.go).
+func TestShippedRulesBlockXXEAndAllowOrdinaryXML(t *testing.T) {
+	h := newShippedRulesWAF(t)
+	blocked := map[string]string{
+		"external SYSTEM entity": `<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a SYSTEM "file:///etc/passwd">]><x>&a;</x>`,
+		"external PUBLIC entity": `<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a PUBLIC "-//x//y" "http://127.0.0.1:1/z">]><x>&a;</x>`,
+		"parameter entity":       `<?xml version="1.0"?><!DOCTYPE x [<!ENTITY % p SYSTEM "http://127.0.0.1:1/x.dtd"> %p;]><x/>`,
+		"lowercase keywords":     `<!doctype x [<!entity a system "file:///etc/hosts">]><x>&a;</x>`,
+	}
+	for name, body := range blocked {
+		if rec := doBodyRequest(t, h, "application/xml", body); rec.Code != http.StatusForbidden {
+			t.Errorf("%s: expected 403, got %d", name, rec.Code)
+		}
+	}
+	allowed := map[string]string{
+		"plain XML":                `<?xml version="1.0"?><x>hello</x>`,
+		"XHTML doctype, no entity": `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html><body>hi</body></html>`,
+	}
+	for name, body := range allowed {
+		if rec := doBodyRequest(t, h, "application/xml", body); rec.Code != http.StatusOK {
+			t.Errorf("%s: expected 200, got %d", name, rec.Code)
+		}
+	}
+}
+
+// Finding #15: the {% %} and <% %> template syntaxes were only covered by a
+// paranoia-level-2 CRS rule; 03-ssti-double-brace.conf now covers them at
+// level 1, with the same narrow "needs an operator or a dangerous primitive"
+// design as the {{ }} rule.
+func TestShippedRulesBlockAllTemplateSyntaxesAndAllowBenignText(t *testing.T) {
+	h := newShippedRulesWAF(t)
+	search := func(q string) string { return "/rest/products/search?q=" + url.QueryEscape(q) }
+	for _, q := range []string{
+		"{{7*7}}",
+		"{% print 7*7 %}",
+		"{% import os %}",
+		"{%- print 7*7 -%}",
+		"<%= 7*7 %>",
+		`<% Runtime.getRuntime().exec("x") %>`,
+	} {
+		if rec := doRequest(t, h, http.MethodGet, search(q)); rec.Code != http.StatusForbidden {
+			t.Errorf("%q: expected 403, got %d", q, rec.Code)
+		}
+	}
+	for _, q := range []string{
+		"{{user.name}}",
+		"use {% tags %} in Jinja",
+		"<%- name %>",
+		"100% sure, 50% off",
+		"apple juice",
+	} {
+		if rec := doRequest(t, h, http.MethodGet, search(q)); rec.Code != http.StatusOK {
+			t.Errorf("%q: expected 200 (benign), got %d", q, rec.Code)
+		}
+	}
+}
+
+func TestXXEDetectModeLogsButDoesNotBlock(t *testing.T) {
+	w := newTestWAF(t, config.WAFConfig{Enabled: true, Mode: "detect", ParanoiaLevel: 1})
+	body := `<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a SYSTEM "file:///etc/passwd">]><x>hello</x>`
+	if rec := doBodyRequest(t, w.Middleware(okHandler()), "application/xml", body); rec.Code != http.StatusOK {
+		t.Fatalf("detect mode should let an XXE body through, got %d", rec.Code)
 	}
 }

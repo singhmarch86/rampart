@@ -221,6 +221,176 @@ https://github.com/singhmarch86/rampart/blob/main/docs/DETECTION.md#out-of-scope
 
 ---
 
+## LinkedIn — new material since the first batch (October 2026)
+
+Drafted after the earlier series. Every number below was measured in this
+repo (sources linked or named); nothing here is an estimate. Order is a
+suggestion: the first two are the strongest, and each stands alone.
+
+### Post: my README listed a feature my firewall doesn't have (finding #14)
+
+My README said my firewall does geo-blocking. My roadmap listed it as
+shipped.
+
+I went looking for the code and there isn't any. No GeoIP database, no
+lookup, nothing. Geo-blocking was in the original plan and I never built
+it, but the docs kept describing the plan as if it were the product.
+
+Nobody had caught it. I found it by reading my own front page the way a
+skeptical stranger would. If someone evaluating a security tool checks one
+headline feature and finds it missing, they'll reasonably discount
+everything else.
+
+The README now says what's actually implemented and says plainly what
+isn't. While I was in there I also found my changelog described two
+releases that were never tagged on GitHub. Fixed that too.
+
+Most of my bug-hunting has been testing behavior. This one was just
+reading. Worth doing before anyone else does it for you.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#14-the-readme-and-roadmap-claimed-geo-blocking-which-doesnt-exist
+
+#buildinpublic #appsec #opensource
+
+### Post: I probed my WAF with one test per OWASP rule category (finding #15)
+
+I wrote a script that sends one standard test string per OWASP Core Rule
+Set category at my WAF, 23 in total, against a local copy only.
+
+First run: 5 not blocked. Then the part that matters: I checked each one
+before calling it a gap.
+
+→ One was my own bug. My test double-encoded the payload, so the WAF saw
+literal text. With the real bytes it was blocked.
+→ One (XXE) really wasn't blocked: OWASP CRS has no rule for external XML
+entities at all.
+→ Two template-injection syntaxes got through, because the rule that
+covers them only runs at a higher paranoia level. My earlier fix covered
+one syntax and I'd called the whole category closed.
+→ One short command (`;id`) was only caught at the highest level I tried.
+
+And a trap: XXE looked blocked at higher paranoia levels. The event log
+said otherwise. The WAF wasn't recognizing the attack, it was blocking the
+app's error page on the way out. A 403 isn't proof of detection.
+
+19 of 23 passed on the first clean run. The 4 that didn't were each worth
+knowing about.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#15-crs-coverage-probe-xxe-and-two-template-injection-syntaxes-arent-blocked
+
+#buildinpublic #appsec #waf #owasp
+
+### Post: turning up your WAF's paranoia level isn't free (measured)
+
+OWASP CRS has four paranoia levels. Higher means more rules and more
+detection. I assumed the cost was "some false positives". I measured it,
+same tool and same target at each level (GoTestWAF against Juice Shop, one
+run each). "Detects" is GoTestWAF's application-attack score:
+
+Level 1: detects 56%, wrongly blocks 13 of 141 legitimate samples (9%)
+Level 2: detects 63%, wrongly blocks 53 of 141 (38%)
+Level 3: detects 66%, wrongly blocks 61 of 141 (43%)
+Level 4: detects 69%, wrongly blocks 141 of 141 (100%)
+
+Two things stood out. The tool's own overall score peaks at level 2, which
+makes level 2 look like the winner while more than a third of legitimate
+traffic gets blocked. And level 4 blocked everything, so it's unusable
+untuned.
+
+Caveats, because they matter: one run per level, one target, and the
+legitimate set is 141 short synthetic samples, not real traffic. Treat the
+percentages as indicative and measure on your own traffic in detect mode.
+
+Takeaway: for a known gap, a narrow custom rule usually beats turning the
+dial up for everything.
+
+https://github.com/singhmarch86/rampart/blob/main/benchmarks/RESULTS.md
+
+#buildinpublic #appsec #waf #owasp
+
+### Post: what Rampart replaces, and what it doesn't
+
+People keep asking if my open-source WAF replaces nginx + ModSecurity +
+fail2ban. The honest answer is a split one.
+
+What it replaces, for HTTP traffic in front of one app:
+→ the ModSecurity module (it embeds Coraza, a Go reimplementation of the
+same engine, running the same OWASP rules)
+→ fail2ban's web-login job (it counts failed logins as they happen and
+blocks the IP for a while)
+→ the log-and-dashboard glue (live dashboard, block-event log)
+
+What it doesn't:
+→ nginx. One upstream per instance, no static files, load balancing,
+caching or rewrites. In Kubernetes it sits behind your Ingress, not
+instead of it.
+→ fail2ban for anything that isn't HTTP. No SSH, no mail. Its blocks are
+HTTP 429s, not firewall drops, and counters live in memory per instance.
+→ ModSecurity's detailed audit log. It records blocks only.
+
+Saying where a tool stops is worth more than a bigger claim. "One binary
+instead of five tools" is true for the security stack. It isn't true for
+your whole edge.
+
+https://github.com/singhmarch86/rampart
+
+#buildinpublic #appsec #opensource #waf
+
+### Post: closing the gaps my own probe found (and the two mistakes on the way)
+
+Follow-up to the WAF probe. Two real gaps: XML external entities (XXE) had
+no rule at any paranoia level, and two template-injection syntaxes were
+only covered by a higher-level rule. Both are closed at the default level
+now. The interesting part is how.
+
+Mistake 1: I wrote the XXE rule first. It blocked nothing. I tested why
+instead of guessing: for an XML request body, the rule language gets an
+empty body variable, and the DOCTYPE where the attack lives isn't exposed
+at all. It works for form bodies, not XML. So the check moved into the Go
+code that already holds the raw bytes.
+
+Mistake 2: my first template regex blocked a harmless `<%- name %>`,
+treating the dash as an operator. A test caught it before it shipped. The
+fix was requiring an operator to sit between two operands.
+
+Verified on the real binary: the probe went from 19 to 22 of 23 passing,
+the core attack suite stayed at 14 of 14, and in the benchmark the share of
+legitimate samples passed stayed at exactly 90.78%, so no new false
+positives on that set.
+
+Not covered, and I say so in the docs: internal entities, XML in encodings
+like UTF-16, and one short command that only the strictest level catches.
+The real XXE defense is turning off external entities in your XML parser.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#15-crs-coverage-probe-xxe-and-two-template-injection-syntaxes-arent-blocked
+
+#buildinpublic #appsec #waf #owasp
+
+### Optional post: my real marketing numbers (only if you want to share them)
+
+Build-in-public, including the numbers that don't flatter me.
+
+One of my posts reached about 9,000 impressions. GitHub's traffic panel
+for the repo, same period: 3 unique visitors, 19 page views. LinkedIn was
+credited with 1 visit.
+
+The repo also showed 306 clones from 106 unique cloners, which sounds
+great until you notice that almost nobody viewed the page. Those are
+almost certainly bots and scanners, not people.
+
+What I take from it: impressions measure feed appearances, not interest.
+I was writing for readers and not giving anyone a reason to click. Changes
+I'm making: a live demo people can attack, a README whose first screen
+makes sense, and a one-command quick start.
+
+I'll report back with the new numbers.
+
+https://github.com/singhmarch86/rampart
+
+#buildinpublic #opensource #appsec
+
+---
+
 ## Show HN (news.ycombinator.com)
 
 **Title:** `Show HN: Rampart – self-hosted WAF/rate-limiter/OIDC gateway, one binary`

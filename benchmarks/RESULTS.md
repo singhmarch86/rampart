@@ -186,6 +186,11 @@ How to read it:
   two near-identical configurations differed by about 0.15 points).
 
 Caveats specific to this table:
+- **Measured before the XXE check and the extended template rule** (finding
+  #15). A level-1 re-run afterwards scored 65.51% overall (application
+  security 56.97%, API security 57.14%, legitimate samples passed 90.78%,
+  unchanged), so the table's level-1 row would move by under a point; the
+  other levels weren't re-run.
 - **One run per level, one target.** Juice Shop only.
 - **The legitimate set is GoTestWAF's 141 short text samples**, not real
   application traffic. They are punctuation-heavy, so the false-positive

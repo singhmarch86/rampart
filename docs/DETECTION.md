@@ -59,6 +59,15 @@ matching a known attack signature. Verified via GoTestWAF: Base64Flat block
 rate 0% → 24%, false-positive rate unchanged. Full story in
 [docs/FINDINGS.md #2](FINDINGS.md#2-waf-0-block-rate-on-base64-encoded-attack-payloads).
 
+**Two more gaps closed outside the rule set.** CRS has no request rule for
+XML external entity (XXE) declarations, and its rule for the `{% %}` and
+`<% %>` template syntaxes only runs at paranoia level 2. The template
+syntaxes are covered by `configs/waf-custom-rules/03-ssti-double-brace.conf`.
+XXE is checked in Go (`internal/waf/waf.go`) instead of in a rule, because
+for an XML body the rule language can't see the raw body where the
+declaration lives. Details, limits and the false-positive check in
+[docs/FINDINGS.md #15](FINDINGS.md#15-crs-coverage-probe-xxe-and-two-template-injection-syntaxes-arent-blocked).
+
 **Paranoia level (`waf.paranoia_level`, 1-4, default 1).** CRS ships its
 rules in tiers: higher levels run more rules and catch more, and wrongly
 block more legitimate traffic. Many rules only exist above level 1 (for
