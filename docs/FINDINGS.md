@@ -11,6 +11,34 @@ Entries are newest first.
 
 ---
 
+## 16. Detect mode records nothing
+
+**Found:** While specifying a change to include matched rule IDs in block
+events (see `docs/SPEC-matched-rule-ids.md`), I looked at what the WAF
+middleware logs in `waf.mode: detect`. `block()` only runs when Coraza
+returns an interruption, and in detect mode (`SecRuleEngine DetectionOnly`)
+it never does, so nothing calls the event logger.
+
+**Verified:** with a real event-log file and the same SQL-injection payload,
+block mode returned `403` and wrote 201 bytes to the log; detect mode
+returned `200` and wrote **0 bytes**. Coraza does record the match in
+detect mode (the "Inbound Anomaly Score Exceeded" rule shows up in the
+transaction's matched rules, flagged non-disruptive); Rampart just never
+reads it there.
+
+**Impact:** the documented tuning workflow is broken. The example config,
+`waf.go` and the paranoia-level docs I wrote recently all say to try `mode:
+detect` first to see what would have been blocked. Today that shows nothing
+in the event log or the dashboard. The XXE check added for #15 does log
+(a plain log line) in detect mode, but the CRS rules don't.
+
+**Status: documented, not fixed.** The fix is phase 0 of the spec: after
+request processing in detect mode, if the "anomaly score exceeded" rule
+matched, emit an event marked as a would-be block. Until then, don't rely
+on detect mode to preview what a higher paranoia level would block.
+
+---
+
 ## 15. CRS coverage probe: XXE and two template-injection syntaxes aren't blocked
 
 **Found:** Wrote `scripts/test-crs-coverage.sh`, one standard canary per OWASP

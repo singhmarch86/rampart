@@ -41,9 +41,10 @@ inline samples: [docs/manual.html](docs/manual.html).
 
 | Doc | What it covers |
 |---|---|
-| [docs/FINDINGS.md](docs/FINDINGS.md) | Every real bug or vulnerability found in Rampart itself during development (8 so far), with root cause, fix, and how the fix was verified |
+| [docs/FINDINGS.md](docs/FINDINGS.md) | Every real bug or vulnerability found in Rampart itself during development (16 so far), with root cause, fix (or stated status), and how it was verified |
 | [benchmarks/RESULTS.md](benchmarks/RESULTS.md) | GoTestWAF benchmark results, including a from-scratch comparison against standalone ModSecurity (the trustworthy external baseline published numbers online don't provide) |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Phase-by-phase build history, what's done, what's deliberately parked and why |
+| [docs/SPEC-matched-rule-ids.md](docs/SPEC-matched-rule-ids.md) | Proposed, not built: record which rules fired on each event, and make detect mode record anything (finding #16) |
 
 ## Project
 

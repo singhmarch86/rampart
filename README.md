@@ -28,7 +28,7 @@ To protect your own app instead, see [Quick start](#quick-start) below.
 - **Benchmarked against ModSecurity** with GoTestWAF: 63.12% vs 63.27% at
   baseline (within noise), 65.25% with one custom rule. Numbers and
   reproduction steps: [benchmarks/RESULTS.md](benchmarks/RESULTS.md).
-- **15 bugs, vulnerabilities and doc errors found in Rampart itself** during
+- **16 bugs, vulnerabilities and doc errors found in Rampart itself** during
   development, each with root cause, fix and how the fix was verified:
   [docs/FINDINGS.md](docs/FINDINGS.md).
 - **It says what it can't do.** Network-layer attacks like MITM and DNS
