@@ -71,7 +71,7 @@ Try a SQL injection in the search box. Try `{{7*7}}`: that one slipped
 past it until I found the gap and fixed it. Hammer the login and watch it
 lock you out. https://[DOMAIN]:9090 shows what it blocks, live.
 
-If you find a bypass, I want to hear it. 14 real findings are already
+If you find a bypass, I want to hear it. 15 real findings are already
 logged with root cause and fix, including bugs in my own code.
 
 Repo: https://github.com/singhmarch86/rampart

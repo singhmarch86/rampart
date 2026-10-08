@@ -59,6 +59,28 @@ matching a known attack signature. Verified via GoTestWAF: Base64Flat block
 rate 0% → 24%, false-positive rate unchanged. Full story in
 [docs/FINDINGS.md #2](FINDINGS.md#2-waf-0-block-rate-on-base64-encoded-attack-payloads).
 
+**Paranoia level (`waf.paranoia_level`, 1-4, default 1).** CRS ships its
+rules in tiers: higher levels run more rules and catch more, and wrongly
+block more legitimate traffic. Many rules only exist above level 1 (for
+example, most of the RCE and SQLi rules, and the template-injection rule for
+`{% %}` / `<% %>` syntax). Measured with GoTestWAF against Juice Shop
+(`benchmarks/RESULTS.md` has the full table and caveats):
+
+| Level | App-security detection | Legitimate samples wrongly blocked |
+|---|---|---|
+| 1 (default) | 56% | 13 of 141 (9%) |
+| 2 | 63% | 53 of 141 (38%) |
+| 3 | 66% | 61 of 141 (43%) |
+| 4 | 69% | 141 of 141 (100%) |
+
+Practical guidance: leave it at 1 unless you have a reason. To try a higher
+level, set `mode: detect` first so matches are logged but not blocked, and
+watch for false positives on your own traffic; GoTestWAF's legitimate set is
+141 short synthetic samples, so these percentages are indicative, not a
+prediction for your application. Known gaps are usually better closed with a
+narrow custom rule (as in the base64 example above) than by raising the
+level for everything.
+
 ---
 
 ## 2. API-abuse — behavior over time, not request content

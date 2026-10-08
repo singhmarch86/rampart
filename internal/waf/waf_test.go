@@ -76,6 +76,40 @@ func TestDetectModeDoesNotBlock(t *testing.T) {
 	}
 }
 
+// CRS's template-injection rule for {% %} / <% %> syntax (934180) only
+// exists at paranoia level 2 and above; the default level 1 never runs it
+// (docs/FINDINGS.md #9 and #15). This is the behavior paranoia_level
+// exposes, so test both sides of it, including that a normal request still
+// passes at the higher level.
+func TestParanoiaLevelEnablesHigherLevelRules(t *testing.T) {
+	payload := "/rest/products/search?q=" + url.QueryEscape("{% print 7*7 %}")
+
+	pl1 := newTestWAF(t, config.WAFConfig{Enabled: true, Mode: "block", ParanoiaLevel: 1})
+	if rec := doRequest(t, pl1.Middleware(okHandler()), http.MethodGet, payload); rec.Code != http.StatusOK {
+		t.Fatalf("level 1 should not run the level-2 template rule, got %d", rec.Code)
+	}
+
+	pl2 := newTestWAF(t, config.WAFConfig{Enabled: true, Mode: "block", ParanoiaLevel: 2})
+	h := pl2.Middleware(okHandler())
+	if rec := doRequest(t, h, http.MethodGet, payload); rec.Code != http.StatusForbidden {
+		t.Fatalf("level 2 should block the template payload, got %d", rec.Code)
+	}
+	clean := "/rest/products/search?q=" + url.QueryEscape("apple juice")
+	if rec := doRequest(t, h, http.MethodGet, clean); rec.Code != http.StatusOK {
+		t.Fatalf("level 2 should still allow a normal search, got %d", rec.Code)
+	}
+}
+
+// Zero means "unset" and must behave exactly like the default (level 1),
+// so configs and callers that never set it are unaffected.
+func TestParanoiaLevelUnsetMatchesDefault(t *testing.T) {
+	payload := "/rest/products/search?q=" + url.QueryEscape("{% print 7*7 %}")
+	w := newTestWAF(t, config.WAFConfig{Enabled: true, Mode: "block"})
+	if rec := doRequest(t, w.Middleware(okHandler()), http.MethodGet, payload); rec.Code != http.StatusOK {
+		t.Fatalf("unset paranoia level should behave as level 1, got %d", rec.Code)
+	}
+}
+
 func TestCustomRuleBlocks(t *testing.T) {
 	dir := t.TempDir()
 	rule := `SecRule REQUEST_URI "@beginsWith /internal-admin/" "id:1000001,phase:1,deny,status:404,log,msg:'blocked internal path'"` + "\n"

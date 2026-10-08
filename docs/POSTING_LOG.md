@@ -26,6 +26,7 @@ the "Posted" column yourself; leave it blank until you have.
 | 12 | Rampart | Finding #9 — the gap the test suite itself found (two-parter, fix post is next) | 2026-10-04 | |
 | 13 | Rampart | WAF tip 1 — path rules must ignore case | 2026-10-06 | |
 | 14 | Rampart | WAF tip 2 — behind a load balancer, tell your WAF which proxies to trust | 2026-10-06 | 2026-10-07 |
+| 15 | Rampart | WAF tip 3 — check which paranoia level a rule needs | 2026-10-08 | |
 | - | Scryer | Why Scryer exists (gap-discovery story) | 2026-09-29 | on hold, per request |
 
 Add a row here every time a new draft is finalized and handed over —

@@ -156,6 +156,45 @@ docker run --rm -v "$PWD/benchmarks/reports-modsecurity:/app/reports" \
   wallarm/gotestwaf --url=http://host.docker.internal:8082 --noEmailReport
 ```
 
+## Comparison: CRS paranoia levels (`waf.paranoia_level`)
+
+Run: 2026-10-08. Same tool (GoTestWAF), same target (local Juice Shop), rate
+limiting off, today's code with the shipped custom rules (`01`-`03`), one
+run per level. The only variable is `waf.paranoia_level`.
+
+| Level | API security TP | App security TP | Legit texts passed | Legit texts wrongly blocked | GoTestWAF overall |
+|---|---|---|---|---|---|
+| 1 (default) | 57.14% | 56.21% | 90.78% | 13 of 141 (9%) | 65.32% |
+| 2 | 85.71% | 62.58% | 62.41% | 53 of 141 (38%) | 74.10% |
+| 3 | 85.71% | 65.76% | 56.74% | 61 of 141 (43%) | 73.48% |
+| 4 | 92.86% | 69.24% | 0.00% | 141 of 141 (100%) | 63.74% |
+
+How to read it:
+- **Detection rises with the level; so does the cost.** Level 2 raises API
+  security detection from 57% to 86% and application security from 56% to
+  63%, but wrongly blocks 38% of the legitimate samples instead of 9%.
+- **GoTestWAF's "overall" score peaks at level 2 (74.10%), which flatters
+  it.** The score averages detection and legitimate-pass rates, so a large
+  detection gain can outweigh a large false-positive cost. Wrongly blocking
+  more than a third of legitimate samples is not a setting most deployments
+  could run without tuning.
+- **Level 4 blocked every legitimate sample** (141 of 141), so it is not
+  usable untuned, and its overall score drops below level 1.
+- Level 1 is 65.32% today, against 65.25% in the earlier "After the fix"
+  run; the small difference is consistent with the later SSTI rule and
+  normal run-to-run variation (see the ModSecurity comparison above, where
+  two near-identical configurations differed by about 0.15 points).
+
+Caveats specific to this table:
+- **One run per level, one target.** Juice Shop only.
+- **The legitimate set is GoTestWAF's 141 short text samples**, not real
+  application traffic. They are punctuation-heavy, so the false-positive
+  percentages are indicative, not a prediction for any particular
+  application. Measure on your own traffic in `mode: detect` before
+  raising the level.
+- **The API-security set is only 14 test cases**, so each is worth about 7
+  points; the 57% to 86% jump is 4 more cases blocked.
+
 ## Honest limitations of this benchmark
 
 - Single run each, not averaged — GoTestWAF's payload set is deterministic per

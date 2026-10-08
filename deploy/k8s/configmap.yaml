@@ -24,6 +24,8 @@ data:
     waf:
       enabled: true
       mode: "block"
+      # CRS paranoia level 1-4; higher catches more, with more false positives.
+      paranoia_level: 1
       custom_rules_dir: ""
 
     api_abuse:

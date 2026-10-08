@@ -84,6 +84,12 @@ type WAFConfig struct {
 	// Mode is "block" (enforce) or "detect" (log matches but let requests through;
 	// useful for tuning a new deployment before enabling enforcement).
 	Mode string `yaml:"mode"`
+	// ParanoiaLevel is the OWASP CRS paranoia level, 1-4 (default 1). Higher
+	// levels run more CRS rules and catch more, at the cost of more false
+	// positives; many rules (e.g. several template-injection and command-
+	// injection rules) only exist at level 2 and above. Changing it affects
+	// what traffic is blocked, so try it with mode "detect" first.
+	ParanoiaLevel int `yaml:"paranoia_level"`
 	// CustomRulesDir, if set, loads every *.conf file in the directory (SecLang syntax,
 	// same as ModSecurity/CRS) after the OWASP Core Rule Set, sorted by filename.
 	CustomRulesDir string `yaml:"custom_rules_dir"`
@@ -254,8 +260,9 @@ func Default() Config {
 			IdleTimeout:        10 * time.Minute,
 		},
 		WAF: WAFConfig{
-			Enabled: true,
-			Mode:    "block",
+			Enabled:       true,
+			Mode:          "block",
+			ParanoiaLevel: 1,
 		},
 		Dashboard: DashboardConfig{
 			Enabled: false,
@@ -320,6 +327,9 @@ func (c Config) Validate() error {
 	}
 	if c.WAF.Enabled && c.WAF.Mode != "" && c.WAF.Mode != "block" && c.WAF.Mode != "detect" {
 		return fmt.Errorf("waf.mode must be \"block\" or \"detect\", got %q", c.WAF.Mode)
+	}
+	if c.WAF.Enabled && (c.WAF.ParanoiaLevel < 1 || c.WAF.ParanoiaLevel > 4) {
+		return fmt.Errorf("waf.paranoia_level must be between 1 and 4, got %d", c.WAF.ParanoiaLevel)
 	}
 	if c.APIAbuse.Enabled {
 		for i, r := range c.APIAbuse.Rules {

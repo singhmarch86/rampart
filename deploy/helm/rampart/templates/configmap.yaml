@@ -17,6 +17,7 @@ data:
     waf:
       enabled: {{ .Values.waf.enabled }}
       mode: {{ .Values.waf.mode | quote }}
+      paranoia_level: {{ .Values.waf.paranoiaLevel | default 1 }}
       custom_rules_dir: {{ if .Values.customWafRules }}"/app/configs/waf-custom-rules"{{ else }}""{{ end }}
 
     api_abuse:

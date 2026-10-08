@@ -54,6 +54,13 @@ waf:
   # "block" enforces; "detect" logs matches without blocking (use this first when
   # tuning a new deployment, to see what CRS would have blocked before enforcing).
   mode: "block"
+  # OWASP CRS paranoia level, 1-4 (default 1). Higher levels run more rules
+  # and catch more, at the cost of more false positives; many rules (several
+  # template-injection and command-injection ones among them) only exist at
+  # level 2 and above. Changing it changes what is blocked, so try a higher
+  # level with mode "detect" first and watch for false positives on your own
+  # traffic. See docs/DETECTION.md for measured numbers.
+  paranoia_level: 1
   # Directory of custom SecLang (.conf) rules, applied after the OWASP Core Rule Set.
   custom_rules_dir: "configs/waf-custom-rules"
   # 0 uses Coraza's defaults (10MB request / 5MB response).

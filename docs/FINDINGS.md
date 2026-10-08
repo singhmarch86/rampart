@@ -11,6 +11,90 @@ Entries are newest first.
 
 ---
 
+## 15. CRS coverage probe: XXE and two template-injection syntaxes aren't blocked
+
+**Found:** Wrote `scripts/test-crs-coverage.sh`, one standard canary per OWASP
+CRS attack category (23 probes, all aimed at localhost), and ran it against
+an isolated local instance at the default paranoia level (1). First run:
+18 passed, 5 not blocked. Each of the five was investigated before being
+called a gap, because "not blocked" can also mean "below the anomaly
+threshold" or "my probe was wrong".
+
+**What each one turned out to be:**
+- **HTTP response splitting (CRLF): my probe's bug, not a gap.** `curl
+  --data-urlencode` double-encoded the `%0d%0a` I passed, so the WAF saw
+  literal text. With real CR/LF bytes the request is blocked (`403`). The
+  script is fixed and carries a comment explaining it.
+- **XXE: a real gap.** An XML body declaring an external entity
+  (`<!ENTITY a SYSTEM "file:///etc/passwd">`) got `500`. That `500` is
+  Juice Shop's, not Rampart's: Rampart logged no block and no error, and
+  Juice Shop returns `500` for any XML body at that endpoint, even a
+  benign `<x>test</x>`. So the request reached the app. CRS's request rules
+  contain no rule that matches an `<!ENTITY` or `<!DOCTYPE` declaration at
+  all. Inert on this demo (the app doesn't parse the XML), but it would
+  matter for a target whose XML parser resolves external entities (file
+  read, SSRF). **Correction, found while testing `waf.paranoia_level`:** at
+  levels 2 and 3 this probe returns `403`, which looks like detection but
+  isn't. The event log shows `Outbound Anomaly Score Exceeded`: the WAF
+  blocked Juice Shop's *error response* (which trips CRS's response-leak
+  rules), not the request. The request still reaches the app at every
+  level, so the gap stands. It also shows a limit of this script: a `403`
+  doesn't say whether the block was request-side or response-side.
+- **`{% %}` and `<%= %>` template syntaxes: a real gap, and an incomplete
+  fix of #9.** Both returned `200`. Only CRS rule 934180 matches them, and
+  it is PL2-only; Rampart runs PL1. The custom rule I added for #9
+  (`03-ssti-double-brace.conf`) only matches `{{ }}`, so Jinja2/Twig
+  statement blocks and ERB/JSP/EJS expression tags are still open. #9
+  fixed the syntax I tested and I called the category closed.
+- **Bare `;id`: only caught at PL3.** A short command with no arguments
+  passed (`200`) at levels 1 and 2 and is blocked (request-side) at level
+  3. CRS does have PL1 rules aimed at short and no-argument commands
+  (932235 "2-3 chars", 932340 "No Arguments"), yet neither caught this
+  probe; the PL3 rules (932237, 932301) are the likely ones, but I didn't
+  confirm which rule fires. Consistent with a false-positive tradeoff
+  (words like `id` are common), though I haven't shown that is the reason.
+  The `; cat /etc/passwd` form in `test-attacks.sh` is blocked at PL1.
+
+**What passed (19):** TRACE method, scanner user-agent, response splitting,
+both LFI probes, RFI, Windows command injection, Shellshock-style header,
+PHP injection, Log4Shell lookups in both a parameter and a header, Java
+class access, SSRF to the cloud metadata address, prototype pollution,
+time-based SQLi, `javascript:` URI XSS, `${7*7}` (blocked by a CRS rule I
+didn't identify), and the two sanity requests.
+
+**The static picture behind it:** counting rules by their paranoia-level
+tag in the vendored CRS v4.25.0 files, much of the rule set doesn't run at
+PL1: RCE has 19 PL1 rules and 28 at PL2-3, SQLi has 20 at PL1 and 40 at
+PL2-4, Java has 6 at PL1 and 8 higher. XSS is the other way (26 at PL1, 7
+higher).
+
+**Limits of this probe:** one canary per category, so a pass doesn't prove a
+category is covered, and a fail isn't automatically a gap (CRS blocks at a
+cumulative score, 5 by default).
+
+**What `waf.paranoia_level` changes (added in response to this finding).**
+The same 23 probes, local Juice Shop, today's code:
+- **Level 1:** 19 pass, 4 not blocked (the four above).
+- **Level 2:** 22 pass. Both template syntaxes are now blocked (CRS rule
+  934180), and the XXE probe "passes" only via the response-side block
+  described above. Only `;id` is still not blocked.
+- **Level 3:** all 23 pass, `;id` included.
+
+That isn't a free fix, because the cost is false positives: in a GoTestWAF
+run at each level, the share of the 141 legitimate-text samples wrongly
+blocked went from 9% at level 1 to 38% at level 2, 43% at level 3 and 100%
+at level 4 (full table and caveats in `benchmarks/RESULTS.md`). So raising
+the level closes the template gap, but at a cost most deployments won't
+accept without tuning, which supports fixing known gaps with narrow custom
+rules (as #9 did) rather than turning the dial up.
+
+**Status:** the setting exists; the gaps themselves are not fixed at the
+default level. Still to build, following #9's pattern: a narrow custom rule
+for XXE declarations, and extending `03-ssti-double-brace.conf` to the
+`{% %}` and `<%= %>` syntaxes.
+
+---
+
 ## 14. The README and roadmap claimed geo-blocking, which doesn't exist
 
 **Found:** While reviewing what a stranger sees on the repo's front page,

@@ -63,6 +63,16 @@ func New(cfg config.WAFConfig, logger *events.Logger) (*WAF, error) {
 	var directives strings.Builder
 	directives.WriteString("Include @coraza.conf-recommended\n")
 	directives.WriteString("Include @crs-setup.conf.example\n")
+	// Must come before the CRS rule files: CRS's initialization rule only
+	// defaults the paranoia level to 1 when it is still unset, so this is the
+	// equivalent of uncommenting the setting in crs-setup.conf. Setting the
+	// blocking level also sets the detection level (CRS defaults it to match).
+	// Zero means unset: leave CRS's own default (1) alone.
+	if cfg.ParanoiaLevel > 0 {
+		fmt.Fprintf(&directives,
+			"SecAction \"id:900000,phase:1,pass,t:none,nolog,setvar:tx.blocking_paranoia_level=%d\"\n",
+			cfg.ParanoiaLevel)
+	}
 	directives.WriteString("Include @owasp_crs/*.conf\n")
 	fmt.Fprintf(&directives, "SecRuleEngine %s\n", engineMode)
 	directives.WriteString("SecRequestBodyAccess On\n")

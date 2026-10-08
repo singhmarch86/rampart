@@ -48,6 +48,9 @@ dashboardIngress:
 waf:
   enabled: true
   mode: block
+  # OWASP CRS paranoia level, 1-4. Higher runs more rules and catches more,
+  # with more false positives; try it with mode: detect first.
+  paranoiaLevel: 1
 
 rateLimit:
   enabled: true
