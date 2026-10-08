@@ -9,7 +9,10 @@ requires network access beyond your own upstream.
 
 ## Scope — read this before trusting a report
 
-Every event in `rampart-events.jsonl` is a **block** decision recording
+Every event in `rampart-events.jsonl` is a **block** decision (the one
+exception: with `waf.mode: detect` the WAF logs `"action":"detect"` events
+for requests it would have blocked but let through; the report counts these
+on a separate line and keeps them out of every block figure) recording
 only `time`, `layer`, `reason`, `client_ip`, `method`, and `path` (see
 `internal/events`). No layer logs allowed traffic, and none capture the
 request payload (query string or body).

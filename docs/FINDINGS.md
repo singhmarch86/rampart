@@ -26,16 +26,32 @@ detect mode (the "Inbound Anomaly Score Exceeded" rule shows up in the
 transaction's matched rules, flagged non-disruptive); Rampart just never
 reads it there.
 
-**Impact:** the documented tuning workflow is broken. The example config,
-`waf.go` and the paranoia-level docs I wrote recently all say to try `mode:
-detect` first to see what would have been blocked. Today that shows nothing
-in the event log or the dashboard. The XXE check added for #15 does log
-(a plain log line) in detect mode, but the CRS rules don't.
+**Impact:** the documented tuning workflow was broken. The example config,
+`waf.go` and the paranoia-level docs all say to try `mode: detect` first to
+see what would have been blocked, and that showed nothing in the event log
+or the dashboard.
 
-**Status: documented, not fixed.** The fix is phase 0 of the spec: after
-request processing in detect mode, if the "anomaly score exceeded" rule
-matched, emit an event marked as a would-be block. Until then, don't rely
-on detect mode to preview what a higher paranoia level would block.
+**Fix:** after request-body processing (and again after response-body
+processing) in detect mode, the middleware looks for the "Inbound/Outbound
+Anomaly Score Exceeded" rule in the matched rules and logs one event with
+the new action `"detect"` (meaning "would have been blocked"). The XXE check
+logs the same kind of event instead of a plain log line. The dashboard and
+`rampart-analyze` keep detect events out of every block count and report
+them separately (a "would block" tile and feed marker; a note in the
+report), because both used to treat every event as a block.
+
+**Verified:** unit tests (detect mode logs exactly one `detect` event for a
+SQL-injection request and none for a clean one; block mode still logs one
+`block` event and no `detect`; the dashboard store and the analyzer keep
+detect events out of totals, top attackers, reasons, timeline and window).
+Live, with the built binary in detect mode in front of a plain upstream:
+the SQL-injection request returned `200` and the event log contained
+`{"action":"detect","layer":"waf","reason":"Inbound Anomaly Score Exceeded
+(Total Score: 8)",...}`; the clean request added nothing.
+
+**Limit:** the event says only that the score crossed the threshold, not
+which rules contributed; that is the rest of
+`docs/SPEC-matched-rule-ids.md` (phases 1-3), not built yet.
 
 ---
 

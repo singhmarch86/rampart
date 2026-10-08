@@ -48,7 +48,7 @@ Saved in `LAUNCH.md` under "LinkedIn — new material since the first batch",
 not yet handed over as finalized text: the false README claim (#14), the
 CRS probe (#15), the measured paranoia-level tradeoff, "what Rampart
 replaces and what it doesn't", the fix post for #15, and an optional post
-sharing the real traffic numbers. Add a row to the main table when one is
+sharing the real traffic numbers, detect mode logged nothing (#16), and the self-assessment scan (nmap/TLS checks). Add a row to the main table when one is
 handed over. Also still held: a v0.2.0 release post (not drafted until the
 tag and image exist).
 

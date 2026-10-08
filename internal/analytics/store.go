@@ -40,8 +40,13 @@ type TimelineBucket struct {
 }
 
 type Stats struct {
-	StartedAt    time.Time        `json:"started_at"`
-	TotalEvents  int              `json:"total_events"`
+	StartedAt   time.Time `json:"started_at"`
+	TotalEvents int       `json:"total_events"`
+	// WouldBlock counts detect-mode events (waf.mode "detect"): requests the
+	// WAF would have blocked but let through. They are deliberately not part
+	// of TotalEvents, ByLayer, TopAttackers, TopReasons or Timeline, which
+	// all describe blocks; they only appear in RecentEvents.
+	WouldBlock   int              `json:"would_block"`
 	ByLayer      map[string]int   `json:"by_layer"`
 	TopAttackers []IPCount        `json:"top_attackers"`
 	TopReasons   []ReasonCount    `json:"top_reasons"`
@@ -57,6 +62,7 @@ type Store struct {
 	// from that same goroutine via a request/response channel to avoid a
 	// separate mutex.
 	recent      []events.Event
+	wouldBlock  int
 	byLayer     map[string]int
 	byIP        map[string]int
 	byReasonKey map[string]*ReasonCount
@@ -130,6 +136,11 @@ func (s *Store) ingest(e events.Event) {
 	s.recent = append(s.recent, e)
 	if len(s.recent) > maxRecentEvents {
 		s.recent = s.recent[len(s.recent)-maxRecentEvents:]
+	}
+
+	if e.Action == events.ActionDetect {
+		s.wouldBlock++
+		return
 	}
 
 	s.byLayer[e.Layer]++
@@ -211,6 +222,7 @@ func (s *Store) snapshot() Stats {
 	return Stats{
 		StartedAt:    s.startedAt,
 		TotalEvents:  total,
+		WouldBlock:   s.wouldBlock,
 		ByLayer:      byLayer,
 		TopAttackers: attackers,
 		TopReasons:   reasons,

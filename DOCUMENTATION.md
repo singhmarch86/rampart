@@ -43,8 +43,9 @@ inline samples: [docs/manual.html](docs/manual.html).
 |---|---|
 | [docs/FINDINGS.md](docs/FINDINGS.md) | Every real bug or vulnerability found in Rampart itself during development (16 so far), with root cause, fix (or stated status), and how it was verified |
 | [benchmarks/RESULTS.md](benchmarks/RESULTS.md) | GoTestWAF benchmark results, including a from-scratch comparison against standalone ModSecurity (the trustworthy external baseline published numbers online don't provide) |
+| [docs/SELF-ASSESSMENT.md](docs/SELF-ASSESSMENT.md) | `scripts/security-assessment.sh`: nmap/openssl/curl checks of a running deployment (open ports, TLS versions, risky methods, block-page leaks), with real results and what was not run |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Phase-by-phase build history, what's done, what's deliberately parked and why |
-| [docs/SPEC-matched-rule-ids.md](docs/SPEC-matched-rule-ids.md) | Proposed, not built: record which rules fired on each event, and make detect mode record anything (finding #16) |
+| [docs/SPEC-matched-rule-ids.md](docs/SPEC-matched-rule-ids.md) | Record which rules fired on each event. Phase 0 (detect mode records events, finding #16) is built; phases 1-3 are proposed |
 
 ## Project
 

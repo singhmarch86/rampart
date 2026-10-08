@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -107,5 +108,31 @@ func TestAggregateNoBurstBelowThreshold(t *testing.T) {
 	s := Aggregate(evts)
 	if len(s.Bursts) != 0 {
 		t.Errorf("expected no burst below burstMinCount, got %+v", s.Bursts)
+	}
+}
+
+func TestAggregateKeepsDetectEventsOutOfBlockStatistics(t *testing.T) {
+	at := mustParse(t, "2026-01-01T00:00:00Z")
+	evts := []events.Event{
+		{Time: at, Action: events.ActionBlock, Layer: "waf", Reason: "sqli", ClientIP: "203.0.113.1", Path: "/a"},
+		{Time: at.Add(time.Hour), Action: events.ActionDetect, Layer: "waf", Reason: "sqli", ClientIP: "203.0.113.9", Path: "/b"},
+	}
+	s := Aggregate(evts)
+	if s.TotalEvents != 1 || s.WouldBlock != 1 {
+		t.Fatalf("expected 1 block and 1 would-block, got %+v", s)
+	}
+	if len(s.TopAttackers) != 1 || s.TopAttackers[0].IP != "203.0.113.1" {
+		t.Fatalf("detect-only IP should not be a top attacker: %+v", s.TopAttackers)
+	}
+	if !s.WindowEnd.Equal(at) {
+		t.Fatalf("detect event should not stretch the window: %v", s.WindowEnd)
+	}
+
+	onlyDetect := Aggregate(evts[1:])
+	if onlyDetect.TotalEvents != 0 || onlyDetect.WouldBlock != 1 {
+		t.Fatalf("detect-only log: %+v", onlyDetect)
+	}
+	if !strings.Contains(Report(onlyDetect, ""), "1 further request(s) were logged in detect mode") {
+		t.Fatalf("report should mention the detect-mode events")
 	}
 }

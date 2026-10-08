@@ -15,7 +15,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -225,6 +224,7 @@ func (w *WAF) Middleware(next http.Handler) http.Handler {
 			w.block(rw, r, tx, it)
 			return
 		}
+		w.recordWouldBlock(r, tx, "Inbound Anomaly Score Exceeded")
 
 		// Restore the body so the reverse proxy can still forward it upstream.
 		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
@@ -258,6 +258,7 @@ func (w *WAF) Middleware(next http.Handler) http.Handler {
 			w.block(rw, r, tx, it)
 			return
 		}
+		w.recordWouldBlock(r, tx, "Outbound Anomaly Score Exceeded")
 
 		for k, vv := range rec.Header() {
 			for _, v := range vv {
@@ -269,31 +270,50 @@ func (w *WAF) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-// blockXXE rejects a request whose XML body declares an external entity,
-// logging it like any other WAF block. In detect mode it only logs and
-// returns false so the request continues. It reports whether it responded.
-func (w *WAF) blockXXE(rw http.ResponseWriter, r *http.Request) bool {
+// logEvent writes one WAF event for r.
+func (w *WAF) logEvent(r *http.Request, action events.Action, reason string) {
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		ip = r.RemoteAddr
 	}
-	const reason = "Request body declares an external XML entity (XXE)"
-	if w.detectOnly {
-		// %q on everything request-derived: the path is attacker-controlled
-		// (same reasoning as proxy.go), and the address can be rewritten from
-		// a forwarded header when trusted_proxies is set.
-		// #nosec G706 -- gosec's taint check doesn't account for %q
-		// escaping; the CR/LF this rule warns about can't survive %q (same
-		// suppression and reasoning as internal/proxy/proxy.go, finding #8).
-		log.Printf("waf: detect mode, would block (%s) from %q: %q %q", reason, ip, r.Method, r.URL.Path)
-		return false
-	}
 	w.logger.Log(events.Event{
-		Action: events.ActionBlock, Layer: "waf", Reason: reason,
+		Action: action, Layer: "waf", Reason: reason,
 		ClientIP: ip, Method: r.Method, Path: r.URL.Path,
 	})
+}
+
+// blockXXE rejects a request whose XML body declares an external entity,
+// logging it like any other WAF block. In detect mode it records a
+// would-block (detect) event and returns false so the request continues. It
+// reports whether it responded.
+func (w *WAF) blockXXE(rw http.ResponseWriter, r *http.Request) bool {
+	const reason = "Request body declares an external XML entity (XXE)"
+	if w.detectOnly {
+		w.logEvent(r, events.ActionDetect, reason)
+		return false
+	}
+	w.logEvent(r, events.ActionBlock, reason)
 	http.Error(rw, "forbidden", http.StatusForbidden)
 	return true
+}
+
+// recordWouldBlock is how detect mode reports. In detect mode Coraza never
+// interrupts a request, so block() never runs and nothing was logged at all
+// (docs/FINDINGS.md #16). Coraza does still record the match: when the
+// anomaly score crosses the threshold, the "Inbound/Outbound Anomaly Score
+// Exceeded" evaluation rule appears in the transaction's matched rules,
+// flagged non-disruptive. If it's there, log one detect event for it. A
+// no-op outside detect mode, so block mode is unchanged.
+func (w *WAF) recordWouldBlock(r *http.Request, tx types.Transaction, evalMessagePrefix string) {
+	if !w.detectOnly {
+		return
+	}
+	for _, mr := range tx.MatchedRules() {
+		if msg := mr.Message(); strings.HasPrefix(msg, evalMessagePrefix) {
+			w.logEvent(r, events.ActionDetect, msg)
+			return
+		}
+	}
 }
 
 func (w *WAF) block(rw http.ResponseWriter, r *http.Request, tx types.Transaction, it *types.Interruption) {

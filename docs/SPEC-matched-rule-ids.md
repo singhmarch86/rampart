@@ -1,6 +1,7 @@
 # Spec: record which rules fired (and make detect mode record anything)
 
-Status: **proposed, not built.** Written 2026-10-08 from experiments on the
+Status: **phase 0 built** (detect-mode events, finding #16); phases 1-3
+proposed, not built. Written 2026-10-08 from experiments on the
 current code; every "verified" statement below was checked, and the open
 questions at the end are what is not.
 
@@ -125,7 +126,7 @@ request continue. A clean request emits nothing.
 
 ## Phases
 
-0. **Detect-mode events** (fixes #16). Smallest change and the prerequisite:
+0. **Detect-mode events** (fixes #16; **done**). Smallest change and the prerequisite:
    emit `action: "detect"` events, update the two consumers so counts stay
    correct, add the docs fix. Tests: detect mode logs an event for an attack
    and none for a clean request; block counts unchanged.

@@ -143,3 +143,38 @@ func TestSnapshotAfterCloseDoesNotHang(t *testing.T) {
 		t.Fatal("Snapshot() hung after Close()")
 	}
 }
+
+// Detect-mode events are "would have blocked" records, not blocks: they must
+// show up in the feed and the would-block counter and nowhere else.
+func TestDetectEventsAreNotCountedAsBlocks(t *testing.T) {
+	logger, store := newTestStore(t)
+
+	logger.Log(events.Event{Action: events.ActionBlock, Layer: "waf", Reason: "sqli", ClientIP: "203.0.113.1"})
+	logger.Log(events.Event{Action: events.ActionDetect, Layer: "waf", Reason: "sqli", ClientIP: "203.0.113.9"})
+	logger.Log(events.Event{Action: events.ActionDetect, Layer: "waf", Reason: "xss", ClientIP: "203.0.113.9"})
+
+	stats := store.Snapshot()
+
+	if stats.TotalEvents != 1 || stats.ByLayer["waf"] != 1 {
+		t.Fatalf("detect events leaked into block totals: total=%d byLayer=%v", stats.TotalEvents, stats.ByLayer)
+	}
+	if stats.WouldBlock != 2 {
+		t.Fatalf("expected 2 would-block events, got %d", stats.WouldBlock)
+	}
+	if len(stats.TopAttackers) != 1 || stats.TopAttackers[0].IP != "203.0.113.1" {
+		t.Fatalf("detect-only IP should not be a top attacker: %+v", stats.TopAttackers)
+	}
+	if len(stats.TopReasons) != 1 || stats.TopReasons[0].Count != 1 {
+		t.Fatalf("detect events leaked into top reasons: %+v", stats.TopReasons)
+	}
+	timelineTotal := 0
+	for _, b := range stats.Timeline {
+		timelineTotal += b.Count
+	}
+	if timelineTotal != 1 {
+		t.Fatalf("detect events leaked into the timeline: %d", timelineTotal)
+	}
+	if len(stats.RecentEvents) != 3 {
+		t.Fatalf("detect events should still appear in the recent feed, got %d", len(stats.RecentEvents))
+	}
+}

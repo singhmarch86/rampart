@@ -3,7 +3,9 @@
 // optionally narrated by an LLM (see llm.go).
 //
 // Scope, stated plainly because it's easy to overclaim: every event
-// Rampart logs is a Block decision (see internal/events) recording only
+// Rampart logs is a Block decision (see internal/events), except detect-mode
+// "would block" events, which Aggregate counts separately and keeps out of
+// every block statistic. Events record only
 // time/layer/reason/IP/method/path — no request payload, and no record of
 // allowed traffic. That means this package can summarize and triage
 // attacks Rampart already caught; it cannot discover attacks that slipped
@@ -64,9 +66,12 @@ type Burst struct {
 }
 
 type Summary struct {
-	WindowStart  time.Time
-	WindowEnd    time.Time
-	TotalEvents  int
+	WindowStart time.Time
+	WindowEnd   time.Time
+	TotalEvents int
+	// WouldBlock counts detect-mode events: requests the WAF would have
+	// blocked but let through. Not included in TotalEvents or any other field.
+	WouldBlock   int
 	ByLayer      map[string]int
 	TopAttackers []IPCount
 	TopReasons   []ReasonCount
@@ -80,6 +85,15 @@ type Summary struct {
 // to trust on its own even without the narrative step in llm.go.
 func Aggregate(evts []events.Event) Summary {
 	s := Summary{ByLayer: make(map[string]int)}
+	blocks := make([]events.Event, 0, len(evts))
+	for _, e := range evts {
+		if e.Action == events.ActionDetect {
+			s.WouldBlock++
+			continue
+		}
+		blocks = append(blocks, e)
+	}
+	evts = blocks
 	if len(evts) == 0 {
 		return s
 	}

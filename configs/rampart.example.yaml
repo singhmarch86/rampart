@@ -53,6 +53,8 @@ waf:
   enabled: true
   # "block" enforces; "detect" logs matches without blocking (use this first when
   # tuning a new deployment, to see what CRS would have blocked before enforcing).
+  # Would-be blocks are written to the event log as "action":"detect" and shown
+  # as "would block" on the dashboard; they are not counted as blocks.
   mode: "block"
   # OWASP CRS paranoia level, 1-4 (default 1). Higher levels run more rules
   # and catch more, at the cost of more false positives; many rules (several

@@ -18,6 +18,11 @@ type Action string
 const (
 	ActionAllow Action = "allow"
 	ActionBlock Action = "block"
+	// ActionDetect marks a request the WAF would have blocked but, because
+	// waf.mode is "detect", let through. It is NOT a block: consumers that
+	// count blocks (the dashboard, rampart-analyze) must keep it out of
+	// those counts and report it separately.
+	ActionDetect Action = "detect"
 )
 
 type Event struct {

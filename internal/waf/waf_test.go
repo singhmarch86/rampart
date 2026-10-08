@@ -214,9 +214,80 @@ func TestShippedRulesBlockAllTemplateSyntaxesAndAllowBenignText(t *testing.T) {
 }
 
 func TestXXEDetectModeLogsButDoesNotBlock(t *testing.T) {
-	w := newTestWAF(t, config.WAFConfig{Enabled: true, Mode: "detect", ParanoiaLevel: 1})
+	w, drain := newCapturingWAF(t, config.WAFConfig{Enabled: true, Mode: "detect", ParanoiaLevel: 1})
 	body := `<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a SYSTEM "file:///etc/passwd">]><x>hello</x>`
 	if rec := doBodyRequest(t, w.Middleware(okHandler()), "application/xml", body); rec.Code != http.StatusOK {
 		t.Fatalf("detect mode should let an XXE body through, got %d", rec.Code)
+	}
+	got := drain()
+	if len(got) != 1 || got[0].Action != events.ActionDetect || !strings.Contains(got[0].Reason, "XXE") {
+		t.Fatalf("expected one detect event for XXE, got %+v", got)
+	}
+}
+
+// newCapturingWAF is newTestWAF plus a way to read back what was logged.
+func newCapturingWAF(t *testing.T, cfg config.WAFConfig) (*WAF, func() []events.Event) {
+	t.Helper()
+	logger, err := events.NewLogger("")
+	if err != nil {
+		t.Fatalf("events.NewLogger: %v", err)
+	}
+	ch, cancel := logger.Subscribe()
+	t.Cleanup(cancel)
+	w, err := New(cfg, logger)
+	if err != nil {
+		t.Fatalf("waf.New: %v", err)
+	}
+	return w, func() []events.Event {
+		var got []events.Event
+		for {
+			select {
+			case e := <-ch:
+				got = append(got, e)
+			default:
+				return got
+			}
+		}
+	}
+}
+
+// Finding #16: in detect mode Coraza never interrupts, so nothing used to be
+// logged and an operator tuning with detect mode saw an empty dashboard.
+func TestDetectModeRecordsWouldBlockEvent(t *testing.T) {
+	w, drain := newCapturingWAF(t, config.WAFConfig{Enabled: true, Mode: "detect"})
+	h := w.Middleware(okHandler())
+	target := "/rest/products/search?q=" + url.QueryEscape(`' OR '1'='1`)
+	if rec := doRequest(t, h, http.MethodGet, target); rec.Code != http.StatusOK {
+		t.Fatalf("detect mode should let the request through, got %d", rec.Code)
+	}
+	got := drain()
+	if len(got) != 1 {
+		t.Fatalf("expected exactly one event, got %+v", got)
+	}
+	e := got[0]
+	if e.Action != events.ActionDetect || e.Layer != "waf" || e.ClientIP != "203.0.113.1" ||
+		!strings.HasPrefix(e.Reason, "Inbound Anomaly Score Exceeded") {
+		t.Fatalf("unexpected detect event: %+v", e)
+	}
+}
+
+func TestDetectModeCleanRequestRecordsNothing(t *testing.T) {
+	w, drain := newCapturingWAF(t, config.WAFConfig{Enabled: true, Mode: "detect"})
+	doRequest(t, w.Middleware(okHandler()), http.MethodGet, "/rest/products/search?q=apple")
+	if got := drain(); len(got) != 0 {
+		t.Fatalf("clean request should log nothing, got %+v", got)
+	}
+}
+
+// Block mode must be unchanged: one block event, never a detect event.
+func TestBlockModeRecordsBlockNotDetect(t *testing.T) {
+	w, drain := newCapturingWAF(t, config.WAFConfig{Enabled: true, Mode: "block"})
+	target := "/rest/products/search?q=" + url.QueryEscape(`' OR '1'='1`)
+	if rec := doRequest(t, w.Middleware(okHandler()), http.MethodGet, target); rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", rec.Code)
+	}
+	got := drain()
+	if len(got) != 1 || got[0].Action != events.ActionBlock {
+		t.Fatalf("expected one block event, got %+v", got)
 	}
 }

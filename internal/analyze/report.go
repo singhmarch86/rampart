@@ -19,6 +19,10 @@ func Report(s Summary, narrative string) string {
 		time.Now().UTC().Format(time.RFC3339), s.WindowStart.Format(time.RFC3339), s.WindowEnd.Format(time.RFC3339), s.TotalEvents)
 	fmt.Fprintf(&b, "> Scope: this covers requests Rampart already blocked. It cannot show attacks that were missed (those aren't logged) and has no request payloads to draft new rules from — see [docs/ANALYZE.md](../docs/ANALYZE.md).\n\n")
 
+	if s.WouldBlock > 0 {
+		fmt.Fprintf(&b, "> %d further request(s) were logged in detect mode (the WAF would have blocked them but let them through). They are not counted in any figure below.\n\n", s.WouldBlock)
+	}
+
 	if s.TotalEvents == 0 {
 		b.WriteString("No blocked requests in this window.\n")
 		return b.String()

@@ -366,6 +366,79 @@ https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#15-crs-covera
 
 #buildinpublic #appsec #waf #owasp
 
+### Post: my WAF's "try it in detect mode first" advice showed you nothing (finding #16)
+
+Every WAF guide says the same thing: before you turn blocking on, run it in
+detect mode and see what it would have blocked. My docs said it too.
+
+I was adding a feature to the event log when I checked what detect mode
+actually writes. Same SQL-injection request, real log file:
+
+Block mode: 403, 201 bytes logged.
+Detect mode: 200, 0 bytes logged.
+
+Nothing. The engine knew it would have blocked the request (the match is
+recorded internally) but my code only logged when the engine returned a
+block, and in detect mode it never does. So the one workflow I told people
+to rely on showed an empty dashboard and an empty log.
+
+The fix was small: in detect mode, read the same match and log it as a
+"would block" event. The part that needed care was everything downstream.
+My dashboard and my report tool both assumed every logged event was a
+block. If I'd just added the events, "would block" requests would have shown
+up as attacks that were stopped, which is the opposite of the truth. So
+they're counted separately now, with tests for both.
+
+Checked on the real binary: the attack request still returns 200, and the
+log gets one "would block" line with the score. A clean request logs nothing.
+
+It's a detail, but it's the kind that matters: the safe-rollout step in the
+docs was the one I had never actually run.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#16-detect-mode-records-nothing
+
+#buildinpublic #appsec #waf #opensource
+
+### Post: I scanned my own firewall the way an attacker would (and tested the test)
+
+Most of my testing so far sent attack payloads at the WAF. That checks the
+rules. It doesn't check the deployment, which is what a scanner or an
+attacker looks at first. So I wrote a script that does the first-look
+checks, using nmap, openssl and curl, and ran it against my own instance
+(local only, with a self-signed certificate).
+
+What it checks: which ports answer, which TLS versions the server accepts,
+whether dangerous HTTP methods are honored, whether the block page reveals
+anything about the engine, and how it handles an oversized header.
+
+Result from my machine's network address: 14 checks, 14 passed. Only the
+proxy port was open, the dashboard (bound to loopback) was not reachable,
+TLS 1.0 and 1.1 were refused, 1.2 and 1.3 accepted, and the block page said
+nothing about rules or engine.
+
+The part I'd rather you took from this is the second run. Scanned via
+loopback instead, the same script failed two checks: the dashboard and my
+test upstream were reachable, because from the machine itself they are. A
+check that can't fail proves nothing, so I also pointed it at a deliberately
+weak TLS 1.0 server to make sure it would say so. It did.
+
+Two things I got wrong on the way: my first oversized-header test was
+measuring the HTTP/2 client's behavior, not the server's (re-run over
+HTTP/1.1: the server answers 431), and I had to scope the port scan, since
+scanning a whole laptop reports every other thing running on it.
+
+What it does not show: nothing here says the app behind the firewall is
+secure, only that the front door is closed. And the script reports missing
+security headers (HSTS, CSP and so on) as information, not a failure,
+because those belong to the app or the layer in front.
+
+The script refuses to run without a flag saying you own the target. Scan
+only what's yours.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/SELF-ASSESSMENT.md
+
+#buildinpublic #appsec #nmap #opensource
+
 ### Optional post: my real marketing numbers (only if you want to share them)
 
 Build-in-public, including the numbers that don't flatter me.

@@ -16,6 +16,10 @@ release with a Docker image on `ghcr.io` (see the note under v0.1.0).
   attacker's lockout hit everyone; `trusted_proxies` added (#12).
 - No read or idle timeouts, so slow clients could hold connections open
   indefinitely; `server.read_timeout` / `server.idle_timeout` added (#13).
+- `waf.mode: detect` logged nothing, so the documented "try it in detect
+  mode first" workflow showed an empty log; it now records `detect` events
+  for requests it would have blocked, kept separate from block counts in the
+  dashboard and `rampart-analyze` (#16).
 - README and roadmap claimed geo-blocking, which was never implemented;
   corrected (#14).
 
@@ -36,6 +40,9 @@ release with a Docker image on `ghcr.io` (see the note under v0.1.0).
   fixed at the default level (#15).
 - XML external-entity (XXE) check in the WAF middleware, and the template
   rule extended to `{% %}` and `<% %>` syntaxes.
+- `scripts/security-assessment.sh`: deployment self-assessment with nmap,
+  openssl and curl (open ports, TLS 1.0/1.1 refused, risky methods, block-page
+  leaks); results in `docs/SELF-ASSESSMENT.md`.
 - Release workflow publishing the image to `ghcr.io` on a version tag.
 
 **Behavior change:** requests slower than 60s to *upload* are now cut off
