@@ -136,3 +136,24 @@ func TestAggregateKeepsDetectEventsOutOfBlockStatistics(t *testing.T) {
 		t.Fatalf("report should mention the detect-mode events")
 	}
 }
+
+func TestAggregateTopRulesAndReport(t *testing.T) {
+	at := mustParse(t, "2026-01-01T00:00:00Z")
+	sqli := events.Rule{ID: 942100, Msg: "SQL Injection Attack Detected via libinjection", Tags: []string{"attack-sqli"}}
+	evts := []events.Event{
+		{Time: at, Action: events.ActionBlock, Layer: "waf", Reason: "x", ClientIP: "203.0.113.1", Rules: []events.Rule{sqli}},
+		{Time: at, Action: events.ActionDetect, Layer: "waf", Reason: "x", ClientIP: "203.0.113.2", Rules: []events.Rule{sqli}},
+	}
+	s := Aggregate(evts)
+	if len(s.TopRules) != 1 || s.TopRules[0].Count != 2 || s.TopRules[0].Class != "sqli" {
+		t.Fatalf("TopRules = %+v", s.TopRules)
+	}
+	rep := Report(s, "")
+	if !strings.Contains(rep, "942100") || !strings.Contains(rep, "SQL Injection Attack Detected") {
+		t.Fatalf("report should list the rule:\n%s", rep)
+	}
+	// Even a log with only detect events lists which rules fired.
+	if !strings.Contains(Report(Aggregate(evts[1:]), ""), "942100") {
+		t.Fatalf("detect-only report should still list the rules")
+	}
+}

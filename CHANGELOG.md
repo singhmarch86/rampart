@@ -34,6 +34,11 @@ release with a Docker image on `ghcr.io` (see the note under v0.1.0).
 - `allowed_hosts`: reject requests whose `Host` or `X-Forwarded-Host` is not
   a name you serve, which stops Host-header poisoning (forged
   password-reset links). Off by default; Helm `allowedHosts`.
+- WAF events now say why: `score` and `rules` (ID, description, severity,
+  paranoia level, attack class, matched variable; never the value). The
+  dashboard feed names the rules and a "Top rules" panel counts them;
+  `rampart-analyze` gains a matching table. Additive fields, existing
+  readers unaffected.
 - Optional TLS termination with your own cert/key (`tls.*`).
 - `rampart -version`, plus a `NOTICE` file and filled-in copyright.
 - Plain Kubernetes manifests in `deploy/k8s/` for `kubectl apply`.

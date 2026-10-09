@@ -7,6 +7,11 @@ separate binary from `rampart` itself — the core proxy has no dependency
 on this tool or on any external API, so running the firewall never
 requires network access beyond your own upstream.
 
+Reports also include a **Top WAF rules** table (rule ID, attack class,
+description, hits) built from the `rules` on WAF events. It counts blocked and
+detect-mode ("would block") events alike, since it answers "which rules fire".
+Events logged before this field existed simply contribute no rules.
+
 ## Scope — read this before trusting a report
 
 Every event in `rampart-events.jsonl` is a **block** decision (the one

@@ -25,6 +25,7 @@ func Report(s Summary, narrative string) string {
 
 	if s.TotalEvents == 0 {
 		b.WriteString("No blocked requests in this window.\n")
+		writeRules(&b, s)
 		return b.String()
 	}
 
@@ -55,6 +56,8 @@ func Report(s Summary, narrative string) string {
 	}
 	b.WriteString("\n")
 
+	writeRules(&b, s)
+
 	b.WriteString("## Most-targeted paths\n\n")
 	b.WriteString("| Path | Count |\n|---|---|\n")
 	for _, p := range s.TopPaths {
@@ -83,4 +86,18 @@ func Report(s Summary, narrative string) string {
 	}
 
 	return b.String()
+}
+
+// writeRules renders which WAF rules fired. It counts blocked and would-block
+// (detect mode) events alike, since the question it answers is "which rules".
+func writeRules(b *strings.Builder, s Summary) {
+	if len(s.TopRules) == 0 {
+		return
+	}
+	b.WriteString("\n## Top WAF rules (blocked and would-block)\n\n")
+	b.WriteString("| Rule | Class | What it detected | Hits |\n|---|---|---|---|\n")
+	for _, r := range s.TopRules {
+		fmt.Fprintf(b, "| %d | %s | %s | %d |\n", r.ID, r.Class, r.Msg, r.Count)
+	}
+	b.WriteString("\n")
 }

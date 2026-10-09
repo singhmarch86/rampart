@@ -156,6 +156,32 @@ at all, because there's nothing content-wise to flag.
 
 ---
 
+## Reading a WAF event
+
+A CRS block's `reason` is always "Inbound Anomaly Score Exceeded (Total
+Score: N)", whatever the attack. The fields next to it say why:
+
+```json
+{"action":"block","layer":"waf","reason":"Inbound Anomaly Score Exceeded (Total Score: 5)",
+ "score":5,
+ "rules":[{"id":942100,"msg":"SQL Injection Attack Detected via libinjection",
+           "severity":2,"pl":1,"tags":["attack-sqli"],"var":"ARGS:q"}]}
+```
+
+`rules` lists the rules that contributed, in match order, capped at 10
+(`rules_omitted` counts the rest). Each has its ID, description, paranoia
+level, attack class (`attack-*` tag) and `var`, the variable that matched. The
+matched value is deliberately not logged: it is attacker input and may contain
+secrets. Custom rules (ID 1000000 and up) appear with their own IDs. The
+anomaly-score evaluation rules themselves are left out, since `reason` and
+`score` already summarize them. The dashboard shows these in the live feed and
+in a "Top rules" panel, which is where to look when tuning in detect mode:
+a rule that keeps firing on legitimate traffic is the one to exclude.
+
+Not recorded: the request payload, rules from allowed (below-threshold)
+traffic, and XXE blocks (made in Go, so they have a specific `reason` but no
+rule list).
+
 ## 5. Host allow-list — which names this deployment serves
 
 Config: `allowed_hosts` (a list; empty disables the layer). Event layer:

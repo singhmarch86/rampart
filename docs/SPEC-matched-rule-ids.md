@@ -1,7 +1,7 @@
 # Spec: record which rules fired (and make detect mode record anything)
 
-Status: **phase 0 built** (detect-mode events, finding #16); phases 1-3
-proposed, not built. Written 2026-10-08 from experiments on the
+Status: **phases 0-2 built** (detect-mode events, finding #16; rule details on
+events; dashboard "Top rules" panel and report table); phase 3 not built. Written 2026-10-08 from experiments on the
 current code; every "verified" statement below was checked, and the open
 questions at the end are what is not.
 
@@ -130,11 +130,11 @@ request continue. A clean request emits nothing.
    emit `action: "detect"` events, update the two consumers so counts stay
    correct, add the docs fix. Tests: detect mode logs an event for an attack
    and none for a clean request; block counts unchanged.
-1. **Rule details on events.** Add `score`, `rules`, `rules_omitted`;
+1. **Rule details on events** (**done**). Add `score`, `rules`, `rules_omitted`;
    selection logic above; tests with the real CRS (attack gives the expected
    rule ID and `ARGS:q`; a clean request gives no rules; a custom rule
    appears with its ID).
-2. **Dashboard and report.** "Top rules" panel and a rules table in
+2. **Dashboard and report** (**done**; the feed line names the rules, a "Top rules" panel and a report table count them across blocked and would-block events). "Top rules" panel and a rules table in
    `rampart-analyze`; `docs/DETECTION.md` section on reading it.
 3. **Later, separately decided:** allowed-traffic sampling, opt-in matched
    values, exclusion suggestions.

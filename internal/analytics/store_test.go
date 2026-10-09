@@ -178,3 +178,22 @@ func TestDetectEventsAreNotCountedAsBlocks(t *testing.T) {
 		t.Fatalf("detect events should still appear in the recent feed, got %d", len(stats.RecentEvents))
 	}
 }
+
+func TestTopRulesCountBlockedAndWouldBlock(t *testing.T) {
+	logger, store := newTestStore(t)
+	sqli := events.Rule{ID: 942100, Msg: "SQL Injection Attack Detected via libinjection", Tags: []string{"attack-sqli"}}
+	xss := events.Rule{ID: 941100, Msg: "XSS Attack Detected via libinjection", Tags: []string{"attack-xss"}}
+	logger.Log(events.Event{Action: events.ActionBlock, Layer: "waf", Reason: "x", ClientIP: "203.0.113.1", Rules: []events.Rule{sqli}})
+	logger.Log(events.Event{Action: events.ActionDetect, Layer: "waf", Reason: "x", ClientIP: "203.0.113.2", Rules: []events.Rule{sqli, xss}})
+
+	stats := store.Snapshot()
+	if len(stats.TopRules) != 2 {
+		t.Fatalf("expected 2 rules, got %+v", stats.TopRules)
+	}
+	if top := stats.TopRules[0]; top.ID != 942100 || top.Count != 2 || top.Class != "sqli" {
+		t.Fatalf("top rule = %+v, want 942100 x2 class sqli", top)
+	}
+	if stats.TotalEvents != 1 {
+		t.Fatalf("detect event leaked into block total: %d", stats.TotalEvents)
+	}
+}

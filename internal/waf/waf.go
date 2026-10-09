@@ -282,6 +282,21 @@ func (w *WAF) logEvent(r *http.Request, action events.Action, reason string) {
 	})
 }
 
+// logMatched writes a WAF event carrying the score and contributing rules
+// from tx, so the log says why and not just "score exceeded".
+func (w *WAF) logMatched(r *http.Request, tx types.Transaction, action events.Action, reason string) {
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		ip = r.RemoteAddr
+	}
+	score, rules, omitted := matchedDetail(tx.MatchedRules())
+	w.logger.Log(events.Event{
+		Action: action, Layer: "waf", Reason: reason,
+		ClientIP: ip, Method: r.Method, Path: r.URL.Path,
+		Score: score, Rules: rules, RulesOmitted: omitted,
+	})
+}
+
 // blockXXE rejects a request whose XML body declares an external entity,
 // logging it like any other WAF block. In detect mode it records a
 // would-block (detect) event and returns false so the request continues. It
@@ -310,7 +325,7 @@ func (w *WAF) recordWouldBlock(r *http.Request, tx types.Transaction, evalMessag
 	}
 	for _, mr := range tx.MatchedRules() {
 		if msg := mr.Message(); strings.HasPrefix(msg, evalMessagePrefix) {
-			w.logEvent(r, events.ActionDetect, msg)
+			w.logMatched(r, tx, events.ActionDetect, msg)
 			return
 		}
 	}
@@ -328,14 +343,7 @@ func (w *WAF) block(rw http.ResponseWriter, r *http.Request, tx types.Transactio
 			reason = msg
 		}
 	}
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		ip = r.RemoteAddr
-	}
-	w.logger.Log(events.Event{
-		Action: events.ActionBlock, Layer: "waf", Reason: reason,
-		ClientIP: ip, Method: r.Method, Path: r.URL.Path,
-	})
+	w.logMatched(r, tx, events.ActionBlock, reason)
 	http.Error(rw, "forbidden", status)
 }
 

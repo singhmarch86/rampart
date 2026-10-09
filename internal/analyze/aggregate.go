@@ -16,6 +16,7 @@ package analyze
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/singhmarch86/rampart/internal/events"
@@ -65,6 +66,14 @@ type Burst struct {
 	Layers []string
 }
 
+// RuleCount is how often one WAF rule contributed to an event.
+type RuleCount struct {
+	ID    int
+	Msg   string
+	Class string // attack class from the rule's attack-* tag, e.g. "sqli"
+	Count int
+}
+
 type Summary struct {
 	WindowStart time.Time
 	WindowEnd   time.Time
@@ -75,9 +84,13 @@ type Summary struct {
 	ByLayer      map[string]int
 	TopAttackers []IPCount
 	TopReasons   []ReasonCount
-	TopPaths     []PathCount
-	MultiVector  []MultiVectorIP
-	Bursts       []Burst
+	// TopRules counts every rule that contributed to a WAF event, blocked or
+	// would-block (detect mode), so it shows which rules fire even when
+	// nothing is being blocked.
+	TopRules    []RuleCount
+	TopPaths    []PathCount
+	MultiVector []MultiVectorIP
+	Bursts      []Burst
 }
 
 // Aggregate computes a Summary from a batch of events. It's pure and
@@ -85,6 +98,7 @@ type Summary struct {
 // to trust on its own even without the narrative step in llm.go.
 func Aggregate(evts []events.Event) Summary {
 	s := Summary{ByLayer: make(map[string]int)}
+	s.TopRules = topRules(evts)
 	blocks := make([]events.Event, 0, len(evts))
 	for _, e := range evts {
 		if e.Action == events.ActionDetect {
@@ -158,6 +172,40 @@ func Aggregate(evts []events.Event) Summary {
 	s.Bursts = detectBursts(evts)
 
 	return s
+}
+
+func topRules(evts []events.Event) []RuleCount {
+	byID := make(map[int]*RuleCount)
+	for _, e := range evts {
+		for _, r := range e.Rules {
+			rc, ok := byID[r.ID]
+			if !ok {
+				rc = &RuleCount{ID: r.ID, Msg: r.Msg}
+				for _, t := range r.Tags {
+					if c, ok := strings.CutPrefix(t, "attack-"); ok {
+						rc.Class = c
+						break
+					}
+				}
+				byID[r.ID] = rc
+			}
+			rc.Count++
+		}
+	}
+	out := make([]RuleCount, 0, len(byID))
+	for _, rc := range byID {
+		out = append(out, *rc)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].ID < out[j].ID
+	})
+	if len(out) > topN {
+		out = out[:topN]
+	}
+	return out
 }
 
 func topIPCounts(m map[string]int, n int) []IPCount {

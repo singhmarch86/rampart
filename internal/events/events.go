@@ -33,6 +33,25 @@ type Event struct {
 	ClientIP string    `json:"client_ip"`
 	Method   string    `json:"method,omitempty"`
 	Path     string    `json:"path,omitempty"`
+
+	// WAF events only. Reason for a CRS block is always the generic
+	// "Inbound Anomaly Score Exceeded"; these say why. See
+	// docs/SPEC-matched-rule-ids.md.
+	Score        int    `json:"score,omitempty"`         // the anomaly score that crossed the threshold
+	Rules        []Rule `json:"rules,omitempty"`         // contributing rules, in match order
+	RulesOmitted int    `json:"rules_omitted,omitempty"` // contributing rules beyond the cap
+}
+
+// Rule is one WAF rule that matched a request.
+type Rule struct {
+	ID       int      `json:"id"`
+	Msg      string   `json:"msg"`
+	Severity int      `json:"severity"`
+	PL       int      `json:"pl,omitempty"`   // paranoia level the rule belongs to, if tagged
+	Tags     []string `json:"tags,omitempty"` // attack-* tags only, e.g. "attack-sqli"
+	// Var is the variable that matched ("ARGS:q"). Never its value: that is
+	// attacker input and may contain secrets.
+	Var string `json:"var,omitempty"`
 }
 
 // Logger writes events as JSON Lines and, optionally, fans them out live to

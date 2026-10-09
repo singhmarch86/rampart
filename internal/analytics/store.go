@@ -12,6 +12,7 @@ package analytics
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/singhmarch86/rampart/internal/events"
@@ -34,6 +35,14 @@ type ReasonCount struct {
 	Count  int    `json:"count"`
 }
 
+// RuleCount is how often one WAF rule contributed to an event.
+type RuleCount struct {
+	ID    int    `json:"id"`
+	Msg   string `json:"msg"`
+	Class string `json:"class,omitempty"` // e.g. "sqli", from the rule's attack-* tag
+	Count int    `json:"count"`
+}
+
 type TimelineBucket struct {
 	Minute time.Time `json:"minute"`
 	Count  int       `json:"count"`
@@ -46,10 +55,14 @@ type Stats struct {
 	// WAF would have blocked but let through. They are deliberately not part
 	// of TotalEvents, ByLayer, TopAttackers, TopReasons or Timeline, which
 	// all describe blocks; they only appear in RecentEvents.
-	WouldBlock   int              `json:"would_block"`
-	ByLayer      map[string]int   `json:"by_layer"`
-	TopAttackers []IPCount        `json:"top_attackers"`
-	TopReasons   []ReasonCount    `json:"top_reasons"`
+	WouldBlock   int            `json:"would_block"`
+	ByLayer      map[string]int `json:"by_layer"`
+	TopAttackers []IPCount      `json:"top_attackers"`
+	TopReasons   []ReasonCount  `json:"top_reasons"`
+	// TopRules counts every rule that contributed to a WAF event, blocked or
+	// would-block (detect mode): the point is to see which rules fire, which
+	// is exactly what tuning in detect mode needs.
+	TopRules     []RuleCount      `json:"top_rules"`
 	Timeline     []TimelineBucket `json:"timeline"`
 	RecentEvents []events.Event   `json:"recent_events"`
 }
@@ -66,6 +79,7 @@ type Store struct {
 	byLayer     map[string]int
 	byIP        map[string]int
 	byReasonKey map[string]*ReasonCount
+	byRule      map[int]*RuleCount
 	byMinute    map[int64]int
 
 	events    <-chan events.Event
@@ -81,6 +95,7 @@ func New(logger *events.Logger) *Store {
 		byLayer:     make(map[string]int),
 		byIP:        make(map[string]int),
 		byReasonKey: make(map[string]*ReasonCount),
+		byRule:      make(map[int]*RuleCount),
 		byMinute:    make(map[int64]int),
 		events:      ch,
 		cancel:      cancel,
@@ -132,10 +147,29 @@ func (s *Store) drainPending() {
 	}
 }
 
+// ruleClass is the rule's attack class: its first attack-* tag without the
+// prefix ("attack-sqli" -> "sqli"), or empty.
+func ruleClass(r events.Rule) string {
+	for _, t := range r.Tags {
+		if c, ok := strings.CutPrefix(t, "attack-"); ok {
+			return c
+		}
+	}
+	return ""
+}
+
 func (s *Store) ingest(e events.Event) {
 	s.recent = append(s.recent, e)
 	if len(s.recent) > maxRecentEvents {
 		s.recent = s.recent[len(s.recent)-maxRecentEvents:]
+	}
+
+	for _, r := range e.Rules {
+		if rc, ok := s.byRule[r.ID]; ok {
+			rc.Count++
+		} else {
+			s.byRule[r.ID] = &RuleCount{ID: r.ID, Msg: r.Msg, Class: ruleClass(r), Count: 1}
+		}
 	}
 
 	if e.Action == events.ActionDetect {
@@ -201,6 +235,20 @@ func (s *Store) snapshot() Stats {
 		reasons = reasons[:topN]
 	}
 
+	rules := make([]RuleCount, 0, len(s.byRule))
+	for _, rc := range s.byRule {
+		rules = append(rules, *rc)
+	}
+	sort.Slice(rules, func(i, j int) bool {
+		if rules[i].Count != rules[j].Count {
+			return rules[i].Count > rules[j].Count
+		}
+		return rules[i].ID < rules[j].ID
+	})
+	if len(rules) > topN {
+		rules = rules[:topN]
+	}
+
 	timeline := make([]TimelineBucket, 0, len(s.byMinute))
 	for m, c := range s.byMinute {
 		timeline = append(timeline, TimelineBucket{Minute: time.Unix(m, 0).UTC(), Count: c})
@@ -226,6 +274,7 @@ func (s *Store) snapshot() Stats {
 		ByLayer:      byLayer,
 		TopAttackers: attackers,
 		TopReasons:   reasons,
+		TopRules:     rules,
 		Timeline:     timeline,
 		RecentEvents: recent,
 	}

@@ -389,11 +389,26 @@ block. If I'd just added the events, "would block" requests would have shown
 up as attacks that were stopped, which is the opposite of the truth. So
 they're counted separately now, with tests for both.
 
-Checked on the real binary: the attack request still returns 200, and the
-log gets one "would block" line with the score. A clean request logs nothing.
+My first fix had its own flaw, and the dashboard showed it. Every attack
+said the same thing: "Inbound Anomaly Score Exceeded". SQL injection, XSS,
+path traversal, identical message. Useless for tuning, because tuning means
+knowing which rule fired.
 
-It's a detail, but it's the kind that matters: the safe-rollout step in the
-docs was the one I had never actually run.
+So the event now names the rules. Same detect-mode run, seven attacks, all
+let through, dashboard showing 0 blocks and 7 would-block:
+
+SQL injection: 942100, SQL Injection via libinjection, on ARGS:q
+Path traversal: 930100, 930110, 930120
+Log4Shell string: 944150
+XSS: 941100, 941110, 941160
+
+Each line carries the attack class, the rule IDs, what each detected and
+which parameter matched. Not the value, because that's attacker input and
+can contain secrets. There's a "Top rules" panel too, which is the thing you
+actually want when you're deciding what to exclude before turning blocking on.
+
+A clean request still logs nothing, and the safe-rollout step in my docs is
+finally one I've actually run.
 
 https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#16-detect-mode-records-nothing
 

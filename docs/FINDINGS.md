@@ -85,9 +85,16 @@ the SQL-injection request returned `200` and the event log contained
 `{"action":"detect","layer":"waf","reason":"Inbound Anomaly Score Exceeded
 (Total Score: 8)",...}`; the clean request added nothing.
 
-**Limit:** the event says only that the score crossed the threshold, not
-which rules contributed; that is the rest of
-`docs/SPEC-matched-rule-ids.md` (phases 1-3), not built yet.
+**Follow-up:** the first fix said only that the score crossed the threshold,
+a generic message for every attack type. Events now also carry `score` and
+`rules` (ID, description, severity, paranoia level, attack class, and the
+variable that matched, never its value), the dashboard feed names them, and
+a "Top rules" panel counts them. Checked live in detect mode: SQL injection
+showed 942100 (`sqli`, `ARGS:q`), path traversal 930100/930110/930120 (`lfi`),
+a Log4Shell string 944150 (`rce`). The list is capped at 10 per event with the
+remainder counted in `rules_omitted`; a payload mixing many attack types hits
+the cap even at paranoia level 1 (16 rules), and the rules kept are the first
+10 in match order.
 
 ---
 

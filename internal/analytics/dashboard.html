@@ -54,7 +54,9 @@
   .feed-row { display: grid; grid-template-columns: 70px 90px 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--panel-border); align-items: baseline; }
   .feed-row .t { color: var(--text-dim); }
   .feed-row .layer { font-weight: 600; }
-  .feed-row .reason { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed-row .reason { color: var(--text-dim); overflow-wrap: anywhere; }
+  .feed-row .why { display: block; color: var(--text); margin-top: 2px; }
+  .cls { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; background: var(--panel-border); color: var(--text); margin-right: 4px; }
   code { background: #1c2230; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
   .public-notice { background: #2a1f0d; border: 1px solid #5a3f14; color: #ffb454; border-radius: 8px; padding: 10px 14px; font-size: 12px; margin-bottom: 16px; }
 </style>
@@ -84,6 +86,11 @@
     </div>
   </div>
 
+  <div class="panel" style="margin-bottom:16px">
+    <h2>Top rules (blocked and would-block)</h2>
+    <table id="rulesTable"><thead><tr><th>Rule</th><th>Class</th><th>What it detected</th><th class="num">Hits</th></tr></thead><tbody></tbody></table>
+  </div>
+
   <div class="panel">
     <h2>Live event feed</h2>
     <div class="feed" id="feed"></div>
@@ -108,6 +115,19 @@ function escapeHtml(s) {
   const d = document.createElement('div');
   d.textContent = s == null ? '' : String(s);
   return d.innerHTML;
+}
+
+// Names the rules behind a WAF event: attack classes, then each rule's ID,
+// description and the variable it matched (never the value).
+function whyHtml(e) {
+  const rules = e.rules || [];
+  if (!rules.length) return '';
+  const classes = [...new Set(rules.flatMap(r => (r.tags || []).filter(t => t.startsWith('attack-')).map(t => t.slice(7))))];
+  const chips = classes.map(c => `<span class="cls">${escapeHtml(c)}</span>`).join('');
+  const list = rules.map(r => `<b>${r.id}</b> ${escapeHtml(r.msg)}${r.var ? ` <code>${escapeHtml(r.var)}</code>` : ''}`).join(' · ');
+  const more = e.rules_omitted ? ` · +${e.rules_omitted} more` : '';
+  const score = e.score ? ` — score ${e.score}` : '';
+  return `<span class="why">${chips}${list}${more}${score}</span>`;
 }
 
 function render(stats) {
@@ -152,13 +172,19 @@ function render(stats) {
     ? reasons.map(r => `<tr><td>${layerDot(r.layer)}${escapeHtml(r.layer)}</td><td>${escapeHtml(r.reason)}</td><td class="num">${r.count}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty">No blocks recorded yet.</td></tr>';
 
+  const rulesBody = document.querySelector('#rulesTable tbody');
+  const topRules = stats.top_rules || [];
+  rulesBody.innerHTML = topRules.length
+    ? topRules.map(r => `<tr><td><code>${r.id}</code></td><td>${r.class ? `<span class="cls">${escapeHtml(r.class)}</span>` : ''}</td><td>${escapeHtml(r.msg)}</td><td class="num">${r.count}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="empty">No WAF rules have fired yet.</td></tr>';
+
   const feed = document.getElementById('feed');
   const events = (stats.recent_events || []).slice(0, 50);
   feed.innerHTML = events.length ? events.map(e => `
     <div class="feed-row">
       <span class="t">${new Date(e.time).toLocaleTimeString()}</span>
       <span class="layer">${layerDot(e.layer)}${escapeHtml(e.layer)}</span>
-      <span class="reason" title="${escapeHtml(e.reason)}"><code>${escapeHtml(e.client_ip)}</code> ${escapeHtml(e.method)} ${escapeHtml(e.path)} — ${e.action === 'detect' ? '[would block] ' : ''}${escapeHtml(e.reason)}</span>
+      <span class="reason" title="${escapeHtml(e.reason)}"><code>${escapeHtml(e.client_ip)}</code> ${escapeHtml(e.method)} ${escapeHtml(e.path)} — ${e.action === 'detect' ? '[would block] ' : ''}${escapeHtml(e.reason)}${whyHtml(e)}</span>
     </div>
   `).join('') : '<div class="empty">No events yet — traffic will appear here as Rampart blocks it.</div>';
 }
