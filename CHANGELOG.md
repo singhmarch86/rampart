@@ -16,6 +16,8 @@ release with a Docker image on `ghcr.io` (see the note under v0.1.0).
   attacker's lockout hit everyone; `trusted_proxies` added (#12).
 - No read or idle timeouts, so slow clients could hold connections open
   indefinitely; `server.read_timeout` / `server.idle_timeout` added (#13).
+- Go 1.26.9 and golang.org/x/net v0.60.0: fixes GO-2026-6617, an HTTP/2
+  server crash (HPACK encoder race) that affects the TLS listener.
 - `waf.mode: detect` logged nothing, so the documented "try it in detect
   mode first" workflow showed an empty log; it now records `detect` events
   for requests it would have blocked, kept separate from block counts in the
