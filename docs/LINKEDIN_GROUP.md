@@ -157,3 +157,57 @@ discovery is the problem: more invites and more useful comments elsewhere.
 - Mass auto-invites or DMs: they get accounts restricted and the group
   looks like spam.
 - Reposting vendor marketing: the group's value is that it isn't.
+
+## Appendix: first three group posts (final text)
+
+Post these in order, a day or two apart, and reply to every comment the same
+day. Replace `<GROUP LINK>` where it appears. Numbers are from this repo's own
+measurements (`benchmarks/RESULTS.md`, `docs/FINDINGS.md`).
+
+### Post 1 (day 1, pin it): welcome
+
+Welcome to WAF Security.
+
+This group is for people who run, tune or break web application firewalls: ModSecurity, Coraza, OWASP CRS, cloud WAFs, anything.
+
+No pitches, no recruiter posts. Real configs, real log lines and real numbers are what make a group like this worth reading.
+
+To get started, reply with:
+1. Which WAF do you run (or want to)?
+2. The most annoying false positive you've fought.
+3. How did you find this group?
+
+I'll go first: I run Coraza with OWASP CRS, and the first thing I learned is that "run it in detect mode first" only helps if detect mode actually logs what it would have blocked. Mine didn't, and I only noticed when I checked the log file.
+
+### Post 2 (day 3): tip
+
+Tip: read the rule IDs, not the score.
+
+With OWASP CRS, almost every block says the same thing: "Inbound Anomaly Score Exceeded". SQL injection, XSS, path traversal, all identical. That message tells you the total crossed the threshold. It tells you nothing about which rule fired, so it tells you nothing about what to exclude.
+
+What I do now is log the contributing rules with each event: the rule ID, its description, which parameter matched (never the value, because that's attacker input and can hold secrets).
+
+Example from a real detect-mode run: a SQL injection string hit 942100 on the `q` parameter. A path traversal hit 930100, 930110 and 930120. A Log4Shell string hit 944150. Once you can see that, tuning stops being guesswork: a rule that keeps firing on legitimate traffic is the one to exclude.
+
+One catch: a payload that mixes many attack types can trip well over a dozen rules, so cap what you log per event and count the rest.
+
+What do you log per blocked request today?
+
+### Post 3 (day 5): question
+
+Question for the group: which paranoia level do you actually run in production, and what did you measure?
+
+For reference, here's what I measured on OWASP CRS, with the same tool and the same target at each level (GoTestWAF against Juice Shop, one run each). "Detects" is the tool's application-attack score:
+
+Level 1: detects 56%, wrongly blocks 13 of 141 legitimate samples (9%)
+Level 2: detects 63%, wrongly blocks 53 of 141 (38%)
+Level 3: detects 66%, wrongly blocks 61 of 141 (43%)
+Level 4: detects 69%, wrongly blocks 141 of 141 (100%)
+
+Caveats: one run per level, one target, and the legitimate set is 141 short synthetic samples, not real traffic. I'd treat the percentages as indicative only, which is why I'm asking.
+
+- Which level are you on, and why?
+- Did you move up from 1, and how did you find out what it would block before turning it on?
+- Anyone running level 2 with exclusions? What did the exclusion list end up looking like?
+
+Join the discussion: <GROUP LINK>
