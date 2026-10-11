@@ -56,5 +56,6 @@ inline samples: [docs/manual.html](docs/manual.html).
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community guidelines |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 | [docs/LAUNCH.md](docs/LAUNCH.md) | Draft launch posts (Show HN, Reddit, LinkedIn) — internal, not for external linking |
+| [docs/LINKEDIN_GROUP.md](docs/LINKEDIN_GROUP.md) | Growth plan and ready-to-paste text for the "WAF Security" LinkedIn group — internal |
 | [docs/POSTING_LOG.md](docs/POSTING_LOG.md) | Which drafts have actually been handed over and (self-reported) posted — internal |
 | [docs/VIDEO_SCRIPTS.md](docs/VIDEO_SCRIPTS.md) | Outlines for demo videos — internal, not for external linking |
