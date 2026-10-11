@@ -28,6 +28,8 @@ the "Posted" column yourself; leave it blank until you have.
 | 14 | Rampart | WAF tip 2 — behind a load balancer, tell your WAF which proxies to trust | 2026-10-06 | 2026-10-07 |
 | 15 | Rampart | WAF tip 3 — check which paranoia level a rule needs | 2026-10-08 | |
 | 16 | Rampart | Finding #16 — "try it in detect mode first" showed you nothing | 2026-10-09 | |
+| 17 | Rampart | Host-header poisoning and the `allowed_hosts` allow-list | 2026-10-10 | |
+| 18 | Rampart | Finding #17 — gRPC doesn't work through the proxy | 2026-10-10 | |
 | - | Scryer | Why Scryer exists (gap-discovery story) | 2026-09-29 | on hold, per request |
 
 Add a row here every time a new draft is finalized and handed over —

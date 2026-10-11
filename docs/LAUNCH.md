@@ -454,6 +454,81 @@ https://github.com/singhmarch86/rampart/blob/main/docs/SELF-ASSESSMENT.md
 
 #buildinpublic #appsec #nmap #opensource
 
+### Post: the attack that makes your own password-reset email phish people (Host-header poisoning)
+
+Here's an attack a WAF can't see, and what I did about it.
+
+You click "forgot password". The app emails you a link. To build that link,
+a lot of apps read the Host header of your request: https://<host>/reset?token=...
+
+An attacker requests a reset for YOUR account, but sends `Host: evil.example`.
+The real service emails you a real reset token inside a link to the
+attacker's server. You click, the attacker gets the token. It's a phishing
+email sent from the legitimate service.
+
+I tested my own WAF against it first. `Host: evil.example`,
+`X-Forwarded-Host: evil.example` and a bare-IP Host all passed straight
+through. That's correct behavior for a content rule: "evil.example" looks
+like any other hostname. Only you know which names are yours.
+
+So I built a small allow-list. You list the hostnames you serve, and any
+request whose Host or X-Forwarded-Host (also X-Host, and Forwarded's host=)
+names something else gets a 403 and a logged event. It also handles ports and
+`*.example.com` wildcards.
+
+On the real binary: allowed hosts, including a subdomain and a port, returned
+200. An evil Host, a bare-IP Host, a good Host plus an evil X-Forwarded-Host,
+and a good Host plus an evil Forwarded header all returned 403, and the
+dashboard logs each one under its own "hostguard" layer (screenshot).
+
+My own tests caught a hole while I built it: `example.com:80 evil.example`
+matched an entry for example.com, because I never validated the port when the
+entry had none. Go's HTTP server happens to reject that exact value with a 400
+before my code sees it, but a check like this shouldn't depend on that.
+Malformed values never match now.
+
+What it doesn't do: it only protects you if you set the list, a wildcard
+trusts every subdomain (so a taken-over one is accepted), and it does nothing
+about open redirects, which also help phishing and which no rule of mine
+catches either.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/DETECTION.md#5-host-allow-list--which-names-this-deployment-serves
+
+#buildinpublic #appsec #phishing #opensource
+
+### Post: someone asked if my firewall handles gRPC, so I tested it instead of answering (finding #17)
+
+Someone asked whether my open-source WAF can find gRPC vulnerabilities. I
+could have answered from the design. I tested it instead.
+
+I wrote a small gRPC server and client (the standard health service: one
+unary call, one streaming call) and ran the same client four ways:
+
+Straight to the server: works, the stream delivers messages.
+Through the proxy over TLS, WAF off: 502. The proxy talks HTTP/1.1 to its
+upstream, and a gRPC server only speaks HTTP/2.
+Through the proxy over TLS, WAF on: 403 on both calls, even for a harmless
+health check. The binary request scored 18 against a block threshold of 5.
+Through the proxy on plain HTTP: it fails before the first call. The plain
+listener doesn't do HTTP/2 without TLS.
+
+So the answer isn't "it misses gRPC attacks". It's that gRPC doesn't work
+through it at all, and nothing in my docs said so. A WAF also can't see inside
+a protobuf message, because there's no decoder for it.
+
+I haven't fixed it. It's documented as a limitation, with the probe in the
+repo so anyone can reproduce it. A fix needs an HTTP/2 upstream, a way to
+let gRPC through the content-type policy, and a decision about streaming,
+since my WAF buffers whole responses and a long-lived stream can't work that
+way.
+
+If you're putting gRPC behind a WAF, check this before you find out in
+production.
+
+https://github.com/singhmarch86/rampart/blob/main/docs/FINDINGS.md#17-grpc-and-protobuf-traffic-does-not-work-through-rampart
+
+#buildinpublic #appsec #grpc #opensource
+
 ### Optional post: my real marketing numbers (only if you want to share them)
 
 Build-in-public, including the numbers that don't flatter me.
