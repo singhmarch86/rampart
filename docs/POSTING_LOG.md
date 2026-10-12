@@ -30,6 +30,7 @@ the "Posted" column yourself; leave it blank until you have.
 | 16 | Rampart | Finding #16 — "try it in detect mode first" showed you nothing | 2026-10-09 | |
 | 17 | Rampart | Host-header poisoning and the `allowed_hosts` allow-list | 2026-10-10 | |
 | 18 | Rampart | Finding #17 — gRPC doesn't work through the proxy | 2026-10-10 | |
+| 19 | Rampart | I scanned my own firewall (and tested the test) — with the scan output screenshot | 2026-10-11 | |
 | - | Scryer | Why Scryer exists (gap-discovery story) | 2026-09-29 | on hold, per request |
 
 Add a row here every time a new draft is finalized and handed over —
