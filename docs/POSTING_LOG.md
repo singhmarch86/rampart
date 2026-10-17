@@ -31,6 +31,10 @@ the "Posted" column yourself; leave it blank until you have.
 | 17 | Rampart | Host-header poisoning and the `allowed_hosts` allow-list | 2026-10-10 | |
 | 18 | Rampart | Finding #17 — gRPC doesn't work through the proxy | 2026-10-10 | |
 | 19 | Rampart | I scanned my own firewall (and tested the test) — with the scan output screenshot | 2026-10-11 | |
+| 20 | Rampart | WAF tip 4 — test your WAF with encoded payloads (profile post) | 2026-10-12 | |
+| 21 | Rampart (group) | Group tip — only a real success should reset a lockout counter | 2026-10-12 | |
+| 22 | Rampart | Finding #15 — one test per OWASP CRS category (final text with the 22/23 screenshot; adapted from the LAUNCH.md draft) | 2026-10-15 | |
+| 23 | Rampart | Finding #14 — my README listed a feature my firewall doesn't have (with the README diff screenshot) | 2026-10-16 | |
 | - | Scryer | Why Scryer exists (gap-discovery story) | 2026-09-29 | on hold, per request |
 
 Add a row here every time a new draft is finalized and handed over —
