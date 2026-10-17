@@ -35,6 +35,7 @@ the "Posted" column yourself; leave it blank until you have.
 | 21 | Rampart (group) | Group tip — only a real success should reset a lockout counter | 2026-10-12 | |
 | 22 | Rampart | Finding #15 — one test per OWASP CRS category (final text with the 22/23 screenshot; adapted from the LAUNCH.md draft) | 2026-10-15 | |
 | 23 | Rampart | Finding #14 — my README listed a feature my firewall doesn't have (with the README diff screenshot) | 2026-10-16 | |
+| 24 | Rampart | Paranoia level isn't free — measured tradeoff (with the results table image) | 2026-10-17 | |
 | - | Scryer | Why Scryer exists (gap-discovery story) | 2026-09-29 | on hold, per request |
 
 Add a row here every time a new draft is finalized and handed over —
