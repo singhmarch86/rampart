@@ -36,6 +36,7 @@ the "Posted" column yourself; leave it blank until you have.
 | 22 | Rampart | Finding #15 — one test per OWASP CRS category (final text with the 22/23 screenshot; adapted from the LAUNCH.md draft) | 2026-10-15 | |
 | 23 | Rampart | Finding #14 — my README listed a feature my firewall doesn't have (with the README diff screenshot) | 2026-10-16 | |
 | 24 | Rampart | Paranoia level isn't free — measured tradeoff (with the results table image) | 2026-10-17 | |
+| 25 | Rampart | Closing the gaps my probe found (XXE + template rule, two mistakes) — with the passing-tests image | 2026-10-20 | |
 | - | Scryer | Why Scryer exists (gap-discovery story) | 2026-09-29 | on hold, per request |
 
 Add a row here every time a new draft is finalized and handed over —
