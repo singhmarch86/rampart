@@ -21,6 +21,9 @@ func main() {
 	flag.Parse()
 	var cred grpc.DialOption = grpc.WithTransportCredentials(insecure.NewCredentials())
 	if *useTLS {
+		// #nosec G402 -- this probe only ever dials a local Rampart started with
+		// a throwaway self-signed certificate, so there is no CA to verify
+		// against; it must never be pointed at a remote host.
 		cred = grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))
 	}
 	conn, err := grpc.NewClient(*target, cred)
