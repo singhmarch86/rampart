@@ -328,6 +328,9 @@ instead of it.
 HTTP 429s, not firewall drops, and counters live in memory per instance.
 → ModSecurity's detailed audit log. It records blocks only.
 
+And since I last wrote this, I've tested two more limits the hard way: gRPC
+doesn't work through it at all, and it can't see inside protobuf.
+
 Saying where a tool stops is worth more than a bigger claim. "One binary
 instead of five tools" is true for the security stack. It isn't true for
 your whole edge.

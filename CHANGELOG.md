@@ -16,8 +16,13 @@ release with a Docker image on `ghcr.io` (see the note under v0.1.0).
   attacker's lockout hit everyone; `trusted_proxies` added (#12).
 - No read or idle timeouts, so slow clients could hold connections open
   indefinitely; `server.read_timeout` / `server.idle_timeout` added (#13).
-- Go 1.26.9 and golang.org/x/net v0.60.0: fixes GO-2026-6617, an HTTP/2
-  server crash (HPACK encoder race) that affects the TLS listener.
+- Go 1.26.10, golang.org/x/net v0.60.0 and Coraza v3.8.1: `govulncheck` went
+  from 13 findings (12 in the Coraza engine, 1 in Go's x509) to none, including
+  several request-inspection bypasses (Content-Type tricks, JSON key collision,
+  `jsDecode`, cookie parsing, multipart, argument limit) and three denial-of-
+  service issues, plus the HTTP/2 server crash GO-2026-6617. I tried to
+  reproduce two of them through Rampart's default configuration and could not;
+  the rest were not probed. Details in #18.
 - `waf.mode: detect` logged nothing, so the documented "try it in detect
   mode first" workflow showed an empty log; it now records `detect` events
   for requests it would have blocked, kept separate from block counts in the

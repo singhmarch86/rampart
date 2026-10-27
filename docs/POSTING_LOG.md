@@ -37,6 +37,9 @@ the "Posted" column yourself; leave it blank until you have.
 | 23 | Rampart | Finding #14 — my README listed a feature my firewall doesn't have (with the README diff screenshot) | 2026-10-16 | |
 | 24 | Rampart | Paranoia level isn't free — measured tradeoff (with the results table image) | 2026-10-17 | |
 | 25 | Rampart | Closing the gaps my probe found (XXE + template rule, two mistakes) — with the passing-tests image | 2026-10-20 | |
+| 26 | Rampart | The live demo dashboard now names the rules (rendered from the live stats API, outside IPs masked) | 2026-10-22 | |
+| 27 | Rampart | Finding #18 — 13 advisories in the WAF engine, CI went red (with the govulncheck before/after image) | 2026-10-27 | |
+| 28 | Rampart (group) | Group question — how do you handle advisories in your WAF engine? | 2026-10-27 | |
 | - | Scryer | Why Scryer exists (gap-discovery story) | 2026-09-29 | on hold, per request |
 
 Add a row here every time a new draft is finalized and handed over —

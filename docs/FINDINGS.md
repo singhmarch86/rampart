@@ -11,6 +11,73 @@ Entries are newest first.
 
 ---
 
+## 18. Thirteen advisories in the WAF engine and Go: CI went red, I tried to reproduce some first
+
+**Found:** The `govulncheck` step in CI failed on commits that touched only
+docs. Running it locally on the code as pushed (Go 1.26.9, Coraza 3.7.0)
+reported **13 vulnerabilities: 12 in Coraza, the WAF engine Rampart is built
+on, and 1 in Go's standard library**, all published after the last dependency
+bump. I first read only the top of the output and wrote this up as three; the
+full scan was 13. By kind:
+
+- **Ways to get a request body or query past inspection (8):** GO-2026-6698
+  (`Content-Type` parameters, a leading Unicode space, or two `Content-Type`
+  headers skip form inspection), GO-2026-6692 (JSON key collision bypasses CRS
+  inspection), GO-2026-6696 (`jsDecode` off-by-one in octal escapes),
+  GO-2026-6694 (cookie parser confusion), GO-2026-6691 (multipart `filename*`
+  decoy bypasses FILES rules), GO-2026-6670 (a truncated multipart body skips
+  the strict-error rule), GO-2026-6668 (parameter flooding drops arguments past
+  the limit), GO-2026-6699 (a URI that fails to parse drops the query string;
+  scoped by the advisory to non-`net/http` integrations).
+- **Denial of service (3):** GO-2026-6697 (file handles accumulate in the
+  multipart processor), GO-2026-6693 (JSON argument-limit truncation reopens a
+  stack overflow that crashes the process), GO-2026-6690 (unbounded recursion in
+  the JSON response processor).
+- **Log forgery (1):** GO-2026-6669 (CRLF injection in Coraza's native audit-log
+  format; Rampart doesn't use that format).
+- **Go standard library (1):** GO-2026-6809, `crypto/x509` distrust of known-
+  compromised intermediate certificates (fixed in Go 1.26.10).
+
+(An earlier advisory, GO-2026-6617, an HTTP/2 server crash fixed in Go 1.26.9
+and x/net v0.60.0, caused the first red run and is covered by the same upgrade
+path.)
+
+**Did it affect Rampart? For the two I tried, I could not reproduce a bypass; the other eleven I did not try.** On a build pinned
+to the vulnerable Coraza 3.7.0 and again on 3.8.0 I sent the same SQL-injection
+and XSS form bodies with each trigger the fix commits describe: media-type
+parameters (several spellings), a leading U+00A0, U+0085 or U+3000, and two
+`Content-Type` headers in several orders. Every one was blocked (403) or
+rejected (400), and 14 odd request-URI shapes (raw angle brackets, bad
+escapes, absolute-form URIs, control and high bytes) were also all blocked or
+rejected by Go before the WAF. Two things likely explain it, neither of which I
+confirmed by disabling them: the Coraza recommended config that Rampart loads
+has its own rule that selects the form processor from the `Content-Type`, and
+the CRS content-type policy rule blocks a media type with a leading Unicode
+space, since that is not an allowed type. So for those two the safe reading is "not shown to
+be exploitable through Rampart's default configuration", not "not vulnerable", and
+the other eleven (JSON key collision, `jsDecode`, cookie parsing, multipart,
+argument limit, and the denial-of-service ones) were never probed, so no claim
+is made about them:
+an operator who removes those rules, or a payload I did not think of, could
+differ. After upgrading, the two-header cases that used to return 400 now
+return 403.
+
+**Fix:** Go 1.26.10 and `coraza/v3` v3.8.1 (with `libinjection-go` v0.3.3 and
+`go-yaml` v1.19.2 pulled in). `govulncheck` went from 13 findings to "No
+vulnerabilities found"; build,
+vet, gofmt, the race tests and gosec pass. Detection is unchanged: the CRS
+coverage probe is still 22 of 23 (only `;id` at the default level).
+
+**The public demo is still on the old engine** until it is redeployed from main
+(its startup script pulls the latest main on reboot). It protects a deliberately
+vulnerable practice app with nothing real behind it.
+
+**Why it surfaced:** CI installs `govulncheck@latest`, so a newly published
+advisory turns the build red even when nothing in the repo changed. That is the
+intended behavior, and it is how this was caught within days of publication.
+
+---
+
 ## 17. gRPC (and protobuf) traffic does not work through Rampart
 
 **Found:** Asked whether Rampart could find gRPC-protocol vulnerabilities, I
